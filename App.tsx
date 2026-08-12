@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Home, CalendarDays, Brain, Banknote, Footprints, Calendar, LogOut } from 'lucide-react';
-import { AppProvider } from '@/store';
-import { AuthProvider, useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
-import { AuthScreen } from '@/screens/AuthScreen';
-import { Dashboard } from '@/screens/Dashboard';
-import { AccountDetail } from '@/screens/AccountDetail';
-import { Calendar as CalendarScreen } from '@/screens/Calendar';
-import { Journey } from '@/screens/Journey';
-import { Finances } from '@/screens/Finances';
-import { Intelligence } from '@/screens/Intelligence';
+import { AppProvider } from './store'; 
+import { AuthProvider, useAuth } from './auth'; 
+import { supabase } from './supabase'; 
+import { AuthScreen } from './AuthScreen'; 
+
+// Importações apontando para a pasta correta src/screens/
+import { Dashboard } from './screens/Dashboard';
+import { AccountDetail } from './screens/AccountDetail';
+import { Calendar as CalendarScreen } from './screens/Calendar';
+import { Journey } from './screens/Journey';
+import { Finances } from './screens/Finances';
+import { Intelligence } from './screens/Intelligence';
+
 
 const DAYS_PT = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
