@@ -290,7 +290,7 @@ function Details({ account, trades, onStatusChange, onDelete }: {
               {sortedTrades.map((t, i) => {
                 const runningTotal = sortedTrades.slice(0, i + 1).reduce((s, tr) => s + tr.amount, 0);
                 return (
-                  <div key={t.id} className="rounded-xl border border-ink-700 bg-ink-850 p-3">
+                  <div key={t.id-{i}} className="rounded-xl border border-ink-700 bg-ink-850 p-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
