@@ -32,6 +32,6 @@ export function Journey() {
 function AchievementCard({ achievement, level }: { achievement: Achievement; level: AccountSize }) {
   const c = SIZE_COLORS[level];
   const { unlocked, progress } = achievement;
-  const pct = Math.min(100, (progress.current / progress.target) * 100);
+  const pct = progress.target > 0 ? Math.min(100, (progress.current / progress.target) * 100) : 0;
   return <div className={`rounded-2xl border p-4 ${unlocked ? 'border-funded-ring bg-funded-soft/50' : 'border-ink-700 bg-ink-850'}`}><div className="flex items-start gap-3"><div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${unlocked ? 'bg-funded-soft text-funded-text' : 'bg-ink-800 text-gray-600'}`}>{unlocked ? <Trophy size={20} /> : <Lock size={18} />}</div><div className="flex-1"><div className="flex items-center gap-2"><h4 className={`text-sm font-bold ${unlocked ? 'text-white' : 'text-gray-400'}`}>{achievement.title}</h4>{unlocked && <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${c.soft} ${c.text}`}>{level}</span>}</div><p className="text-xs text-gray-500 mt-0.5">{achievement.description}</p><div className="flex items-center gap-2 mt-2.5"><div className="flex-1 h-1.5 rounded-full bg-ink-800 overflow-hidden"><div className={`h-full rounded-full ${unlocked ? 'bg-funded-text' : c.dot}`} style={{ width: `${pct}%` }} /></div><span className="text-xs font-bold text-gray-500">{progress.current}/{progress.target}</span></div></div></div></div>;
 }
