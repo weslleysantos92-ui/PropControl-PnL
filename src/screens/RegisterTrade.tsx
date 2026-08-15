@@ -5,7 +5,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '@/store';
-import { ASSETS, CONTEXTS, TIMEFRAMES, TRADE_RESULTS, type Account, type Asset, type Context, type Timeframe, type TradeResult } from '@/types';
+import { ASSETS, CONTEXTS, TIMEFRAMES, type Account, type Asset, type Context, type Timeframe, type TradeResult } from '@/types';
 
 interface RegisterTradeProps {
   accountId: string;
@@ -43,7 +43,10 @@ export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTrad
   const saveTrade = () => {
     const value = Number(amount.replace(',', '.'));
     if (!Number.isFinite(value) || value <= 0) return;
-    addTrade({ accountId: account.id, asset, context, timeframe, result, amount: value, note: note.trim() || undefined });
+
+    // O valor digitado é sempre positivo no formulário; o resultado define o sinal contábil.
+    const signedAmount = result === 'Stop' ? -value : result === 'BE' ? 0 : value;
+    addTrade({ accountId: account.id, asset, context, timeframe, result, amount: signedAmount, note: note.trim() || undefined });
     onBack();
   };
 
