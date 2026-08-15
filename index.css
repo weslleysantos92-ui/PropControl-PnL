@@ -88,4 +88,15 @@ input, textarea, select, button {
     @apply w-full px-4 py-3 rounded-xl bg-ink-900 border border-ink-700 text-white placeholder-gray-500
            focus:outline-none focus:border-ink-500 transition-colors;
   }
+
+  .pc-primary-card {
+    min-height: 180px;
+  }
+
+  .pc-stat-card {
+    min-height: 104px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 }
