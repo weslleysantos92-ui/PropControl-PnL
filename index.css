@@ -100,3 +100,96 @@ input, textarea, select, button {
     justify-content: space-between;
   }
 }
+
+/* PropControl Mobile Design System
+   Compacta a interface sem reduzir a legibilidade e sem alterar a lógica das telas. */
+@media (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+  }
+
+  .pc-main {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 12px 8px 104px;
+  }
+
+  .pc-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* A Dashboard já possui padding próprio; reduzimos o segundo nível para evitar a
+     sensação de cards largos demais no celular. */
+  .pc-dashboard > div:first-child {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  /* Compactação consistente dos containers premium */
+  .pc-main .p-5 { padding: 16px !important; }
+  .pc-main .p-6 { padding: 18px !important; }
+  .pc-main .px-5 { padding-left: 16px !important; padding-right: 16px !important; }
+  .pc-main .px-6 { padding-left: 18px !important; padding-right: 18px !important; }
+  .pc-main .py-5 { padding-top: 16px !important; padding-bottom: 16px !important; }
+  .pc-main .py-6 { padding-top: 18px !important; padding-bottom: 18px !important; }
+
+  .pc-main .gap-5 { gap: 16px !important; }
+  .pc-main .gap-4 { gap: 12px !important; }
+  .pc-main .gap-3 { gap: 10px !important; }
+
+  .pc-main .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px !important; }
+  .pc-main .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px !important; }
+
+  .pc-main .rounded-3xl { border-radius: 20px !important; }
+  .pc-main .rounded-2xl { border-radius: 18px !important; }
+
+  /* Hierarquia tipográfica: números continuam fortes, mas ocupam menos altura. */
+  .pc-main [class*="text-[26px]"] { font-size: 23px !important; }
+  .pc-main [class*="text-[24px]"] { font-size: 21px !important; }
+  .pc-main [class*="text-[22px]"] { font-size: 20px !important; }
+  .pc-main [class*="text-[20px]"] { font-size: 18px !important; }
+  .pc-main [class*="text-[18px]"] { font-size: 17px !important; }
+
+  .pc-main .pc-primary-card { min-height: 150px; }
+  .pc-main .pc-stat-card { min-height: 88px; }
+
+  /* Cards horizontais: nunca deixar conteúdo essencial escapar da largura. */
+  .pc-main .min-w-0 { min-width: 0; }
+  .pc-main button { max-width: 100%; }
+
+  /* Navegação inferior mais baixa e respirável, preservando a área segura. */
+  .pc-mobile-nav,
+  .pc-mobile-nav > div {
+    height: 70px !important;
+  }
+
+  .pc-mobile-nav > div {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pc-mobile-nav button {
+    height: 58px !important;
+    gap: 4px !important;
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .pc-main {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .pc-dashboard > div:first-child {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  .pc-main .p-5 { padding: 14px !important; }
+  .pc-main .px-5 { padding-left: 14px !important; padding-right: 14px !important; }
+  .pc-main .gap-4 { gap: 10px !important; }
+  .pc-main .gap-3 { gap: 8px !important; }
+}
