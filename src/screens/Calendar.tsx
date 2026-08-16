@@ -53,7 +53,7 @@ export function Calendar() {
   }, [dayMap, year, month]);
 
   return (
-    <div className="min-h-full bg-[#0A0A0A] px-4 pt-5 pb-28 text-white md:px-6">
+    <div className="pc-calendar min-h-full bg-[#0A0A0A] px-4 pt-5 pb-28 text-white md:px-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -97,10 +97,10 @@ export function Calendar() {
           </div>
         </section>
 
-        <section className="grid grid-cols-3 gap-2 md:gap-3">
-          <div className="flex min-h-[92px] flex-col justify-between rounded-xl border border-white/[0.07] bg-[#101112] p-3 md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Resultado do mês</span><span className={`text-base font-bold md:text-xl ${monthStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(monthStats.pnl)}</span></div>
-          <div className="flex min-h-[92px] flex-col justify-between rounded-xl border border-white/[0.07] bg-[#101112] p-3 md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Gain</span><span className="text-base font-bold text-emerald-400 md:text-xl">{monthStats.gains}</span></div>
-          <div className="flex min-h-[92px] flex-col justify-between rounded-xl border border-white/[0.07] bg-[#101112] p-3 md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Loss</span><span className="text-base font-bold text-red-400 md:text-xl">{monthStats.losses}</span></div>
+        <section className="pc-calendar-summary grid grid-cols-3 gap-2 md:gap-3">
+          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Resultado do mês</span><span className={`mt-2 text-base font-bold md:text-xl ${monthStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(monthStats.pnl)}</span></div>
+          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Gain</span><span className="mt-2 text-base font-bold text-emerald-400 md:text-xl">{monthStats.gains}</span></div>
+          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Loss</span><span className="mt-2 text-base font-bold text-red-400 md:text-xl">{monthStats.losses}</span></div>
         </section>
       </div>
 
