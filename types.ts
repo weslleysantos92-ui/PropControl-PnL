@@ -17,7 +17,6 @@ export interface Account {
   code: string;
   size: AccountSize;
   status: AccountStatus;
-  propFirm: string;
   createdAt: number;
   queueOrder: number;
   fundedAt?: number;
@@ -63,30 +62,58 @@ export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
 export const ACCOUNT_SIZES: AccountSize[] = ['25K', '50K', '100K', '150K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
 
-export const SIZE_VALUES: Record<AccountSize, number> = { '25K': 25000, '50K': 50000, '100K': 100000, '150K': 150000 };
-export const EVALUATION_TARGET_PCT: Record<AccountSize, number> = { '25K': 5, '50K': 6, '100K': 6, '150K': 6 };
+export const SIZE_VALUES: Record<AccountSize, number> = {
+  '25K': 25000,
+  '50K': 50000,
+  '100K': 100000,
+  '150K': 150000,
+};
+
+export const EVALUATION_TARGET_PCT: Record<AccountSize, number> = {
+  '25K': 6,
+  '50K': 6,
+  '100K': 6,
+  '150K': 6,
+};
+
 export const PROFITABLE_DAYS_TARGET = 5;
 
-export interface LucidFlexRules {
-  evaluationTarget: number;
-  evaluationTargetPct: number;
-  maxDrawdown: number;
-  minProfitableDays: number;
-  minDailyProfit: number;
-  maxWithdraw: number;
-  profitSplit: number;
+export interface PnLRule {
+  capital: number;
+  target: number;
+  drawdown: number;
+  floor: number;
+  daily: number;
 }
 
-export const LUCIDFLEX_RULES: Record<AccountSize, LucidFlexRules> = {
-  '25K': { evaluationTarget: 1250, evaluationTargetPct: 5, maxDrawdown: 1000, minProfitableDays: 5, minDailyProfit: 100, maxWithdraw: 1000, profitSplit: 90 },
-  '50K': { evaluationTarget: 3000, evaluationTargetPct: 6, maxDrawdown: 2000, minProfitableDays: 5, minDailyProfit: 150, maxWithdraw: 2000, profitSplit: 90 },
-  '100K': { evaluationTarget: 6000, evaluationTargetPct: 6, maxDrawdown: 3000, minProfitableDays: 5, minDailyProfit: 200, maxWithdraw: 2500, profitSplit: 90 },
-  '150K': { evaluationTarget: 9000, evaluationTargetPct: 6, maxDrawdown: 4500, minProfitableDays: 5, minDailyProfit: 250, maxWithdraw: 3000, profitSplit: 90 },
+export const PNL_RULES: Record<AccountSize, PnLRule> = {
+  '25K': { capital: 25000, target: 1500, drawdown: 1500, floor: 23500, daily: 750 },
+  '50K': { capital: 50000, target: 3000, drawdown: 3000, floor: 47000, daily: 1500 },
+  '100K': { capital: 100000, target: 6000, drawdown: 6000, floor: 94000, daily: 3000 },
+  '150K': { capital: 150000, target: 9000, drawdown: 9000, floor: 141000, daily: 4500 },
 };
 
-export const SIZE_COLORS: Record<AccountSize, { soft: string; text: string; ring: string; dot: string; label: string }> = {
-  '25K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul' },
-  '50K': { soft: 'bg-size50-soft', text: 'text-size50-text', ring: 'ring-size50-ring', dot: 'bg-size50', label: 'Roxo' },
-  '100K': { soft: 'bg-size100-soft', text: 'text-size100-text', ring: 'ring-size100-ring', dot: 'bg-size100', label: 'Dourado' },
-  '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Esmeralda' },
+export interface AccountColor {
+  soft: string;
+  text: string;
+  ring: string;
+  dot: string;
+  label: string;
+}
+
+export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
+  '25K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
+  '50K': { soft: 'bg-size50-soft', text: 'text-size50-text', ring: 'ring-size50-ring', dot: 'bg-size50', label: 'Roxo Neon' },
+  '100K': { soft: 'bg-size100-soft', text: 'text-size100-text', ring: 'ring-size100-ring', dot: 'bg-size100', label: 'Laranja/Dourado' },
+  '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
+
+export function getAccountColor(size: AccountSize): AccountColor {
+  return SIZE_COLORS[size];
+}
+
+export function getAccountPhaseLabel(status: AccountStatus): string {
+  if (status === 'Avaliacao') return 'Challenge';
+  if (status === 'Financiada') return 'Funded Pro';
+  return 'Reprovada';
+}
