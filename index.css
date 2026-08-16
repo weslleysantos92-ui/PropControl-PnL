@@ -4,263 +4,101 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-}
-
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-html, body, #root {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: #1A1D21;
-  color: #e5e7eb;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
-}
-
-input, textarea, select, button {
-  font-family: inherit;
-}
-
+:root { color-scheme: dark; }
+* { -webkit-tap-highlight-color: transparent; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: #1A1D21; color: #e5e7eb; font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
+input, textarea, select, button { font-family: inherit; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-@keyframes sheet-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .animate-sheet-up { animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .animate-fade-in { animation: fade-in 0.2s ease-out; }
-
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
+@keyframes scale-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .animate-scale-in { animation: scale-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
-
-@keyframes pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.18); }
-  100% { transform: scale(1); }
-}
+@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
 .animate-pop { animation: pop 0.4s ease-out; }
-
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .safe-top { padding-top: env(safe-area-inset-top); }
-
-@keyframes dash-card-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes dash-card-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 .animate-dash-card-in { animation: dash-card-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
-
-@keyframes dash-glow {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.85; }
-}
+@keyframes dash-glow { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
 .animate-dash-glow { animation: dash-glow 3s ease-in-out infinite; }
-
-@keyframes dash-bar-fill {
-  from { width: 0; }
-}
+@keyframes dash-bar-fill { from { width: 0; } }
 .animate-dash-bar-fill { animation: dash-bar-fill 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
-
-@keyframes dash-tab-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes dash-tab-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .animate-dash-tab-in { animation: dash-tab-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
-
 @layer components {
-  .input {
-    @apply w-full px-4 py-3 rounded-xl bg-ink-900 border border-ink-700 text-white placeholder-gray-500
-           focus:outline-none focus:border-ink-500 transition-colors;
-  }
-
-  .pc-primary-card {
-    min-height: 180px;
-  }
-
-  .pc-stat-card {
-    min-height: 104px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
+  .input { @apply w-full px-4 py-3 rounded-xl bg-ink-900 border border-ink-700 text-white placeholder-gray-500 focus:outline-none focus:border-ink-500 transition-colors; }
+  .pc-primary-card { min-height: 180px; }
+  .pc-stat-card { min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; }
 }
 
 /* PropControl Mobile Design System */
 @media (max-width: 640px) {
-  html, body {
-    overflow-x: hidden;
-  }
-
-  .pc-main {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    padding: 8px 4px 104px;
-  }
-
-  .pc-main > * {
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .pc-dashboard > div:first-child {
-    padding-left: 4px !important;
-    padding-right: 4px !important;
-    padding-top: 8px !important;
-  }
-
-  .pc-dashboard {
-    width: calc(100% + 8px);
-    margin-left: -4px;
-  }
-
+  html, body { overflow-x: hidden; }
+  .pc-main { width: 100%; max-width: 100%; box-sizing: border-box; padding: 8px 4px 104px; }
+  .pc-main > * { min-width: 0; max-width: 100%; }
+  .pc-dashboard > div:first-child { padding-left: 4px !important; padding-right: 4px !important; padding-top: 8px !important; }
+  .pc-dashboard { width: calc(100% + 8px); margin-left: -4px; }
+  .pc-calendar { width: calc(100% + 8px); margin-left: -4px; }
   .pc-main .p-5 { padding: 16px !important; }
   .pc-main .p-6 { padding: 18px !important; }
   .pc-main .px-5 { padding-left: 16px !important; padding-right: 16px !important; }
   .pc-main .px-6 { padding-left: 18px !important; padding-right: 18px !important; }
   .pc-main .py-5 { padding-top: 16px !important; padding-bottom: 16px !important; }
   .pc-main .py-6 { padding-top: 18px !important; padding-bottom: 18px !important; }
-
   .pc-main .gap-5 { gap: 16px !important; }
   .pc-main .gap-4 { gap: 12px !important; }
   .pc-main .gap-3 { gap: 10px !important; }
-
   .pc-main .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px !important; }
   .pc-main .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px !important; }
-
   .pc-main .rounded-3xl { border-radius: 20px !important; }
   .pc-main .rounded-2xl { border-radius: 18px !important; }
-
   .pc-main [class*="text-[26px]"] { font-size: 23px !important; }
   .pc-main [class*="text-[24px]"] { font-size: 21px !important; }
   .pc-main [class*="text-[22px]"] { font-size: 20px !important; }
   .pc-main [class*="text-[20px]"] { font-size: 18px !important; }
   .pc-main [class*="text-[18px]"] { font-size: 17px !important; }
-
   .pc-main .pc-primary-card { min-height: 150px; }
   .pc-main .pc-stat-card { min-height: 88px; }
   .pc-main .min-w-0 { min-width: 0; }
   .pc-main button { max-width: 100%; }
 
   /* Dashboard: prioriza leitura e evita que nome/status/metrica ocupem o mesmo espaco. */
-  .pc-dashboard > div:first-child .flex.items-center.gap-4 {
-    gap: 10px !important;
-  }
-
+  .pc-dashboard > div:first-child .flex.items-center.gap-4 { gap: 10px !important; }
   .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2,
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-1.min-w-0 > div:first-child {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    overflow-wrap: anywhere;
-  }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-1.min-w-0 > div:first-child { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2 { font-size: 21px !important; line-height: 1.12 !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-shrink-0.w-11.h-11 { width: 38px !important; height: 38px !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0 svg { width: 21px !important; height: 21px !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0 + .flex-shrink-0 + .flex-1 { min-width: 0 !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.items-end { min-width: 78px; max-width: 86px; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.gap-1.w-\[100px\] { width: 86px !important; flex-shrink: 1 !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 { gap: 8px !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0.w-8.h-8 { width: 30px !important; height: 30px !important; }
+  .pc-dashboard > div:first-child section > button { min-height: 56px; }
+  .pc-dashboard > div:first-child section > button span { line-height: 1.25 !important; }
 
-  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2 {
-    font-size: 21px !important;
-    line-height: 1.12 !important;
-  }
+  /* Calendario: resumo mensal sempre centralizado. */
+  .pc-calendar-summary > div { align-items: center !important; justify-content: center !important; text-align: center !important; }
+  .pc-calendar-summary > div > span { display: block; max-width: 100%; }
 
-  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-shrink-0.w-11.h-11 {
-    width: 38px !important;
-    height: 38px !important;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0 svg {
-    width: 21px !important;
-    height: 21px !important;
-  }
-
-  /* Cards de conta: deixa a area do nome respirar e comprime apenas a metrica lateral. */
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0 + .flex-shrink-0 + .flex-1 {
-    min-width: 0 !important;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.items-end {
-    min-width: 78px;
-    max-width: 86px;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.gap-1.w-\[100px\] {
-    width: 86px !important;
-    flex-shrink: 1 !important;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 {
-    gap: 8px !important;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex-shrink-0.w-8.h-8 {
-    width: 30px !important;
-    height: 30px !important;
-  }
-
-  /* Cabecalhos das carteiras podem quebrar linha, mas nunca colidem com contador/seta. */
-  .pc-dashboard > div:first-child section > button {
-    min-height: 56px;
-  }
-
-  .pc-dashboard > div:first-child section > button span {
-    line-height: 1.25 !important;
-  }
-
-  .pc-mobile-nav,
-  .pc-mobile-nav > div {
-    height: 70px !important;
-  }
-
-  .pc-mobile-nav > div {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .pc-mobile-nav button {
-    height: 58px !important;
-    gap: 4px !important;
-    font-size: 9px !important;
-  }
+  .pc-mobile-nav, .pc-mobile-nav > div { height: 70px !important; }
+  .pc-mobile-nav > div { padding-bottom: env(safe-area-inset-bottom); }
+  .pc-mobile-nav button { height: 58px !important; gap: 4px !important; font-size: 9px !important; }
 }
 
 @media (max-width: 380px) {
-  .pc-main {
-    padding-left: 2px;
-    padding-right: 2px;
-  }
-
-  .pc-dashboard {
-    width: calc(100% + 4px);
-    margin-left: -2px;
-  }
-
-  .pc-dashboard > div:first-child {
-    padding-left: 2px !important;
-    padding-right: 2px !important;
-  }
-
+  .pc-main { padding-left: 2px; padding-right: 2px; }
+  .pc-dashboard { width: calc(100% + 4px); margin-left: -2px; }
+  .pc-calendar { width: calc(100% + 4px); margin-left: -2px; }
+  .pc-dashboard > div:first-child { padding-left: 2px !important; padding-right: 2px !important; }
   .pc-main .p-5 { padding: 14px !important; }
   .pc-main .px-5 { padding-left: 14px !important; padding-right: 14px !important; }
   .pc-main .gap-4 { gap: 10px !important; }
   .pc-main .gap-3 { gap: 8px !important; }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2 {
-    font-size: 19px !important;
-  }
-
-  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.gap-1.w-\[100px\] {
-    width: 78px !important;
-  }
+  .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2 { font-size: 19px !important; }
+  .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.gap-1.w-\[100px\] { width: 78px !important; }
 }
