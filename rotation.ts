@@ -1,5 +1,5 @@
 import type { Account, AccountSize, AccountStatus, Trade } from './types';
-import { SIZE_VALUES, EVALUATION_TARGET_PCT, PROFITABLE_DAYS_TARGET, LUCIDFLEX_RULES } from './types';
+import { SIZE_VALUES, EVALUATION_TARGET_PCT, PROFITABLE_DAYS_TARGET } from './types';
 import { operationalDay } from './dates';
 
 /**
@@ -50,23 +50,31 @@ export interface AccountStats {
   totalAmount: number;
 }
 
+/**
+ * Estatísticas da conta seguindo as regras atuais da PnL Global.
+ * Um dia operacional é lucrativo quando a soma de todos os trades daquele
+ * dia é positiva. Não há regra Lucid/Flex ou mínimo diário separado.
+ */
 export function getAccountStats(account: Account, trades: Trade[]): AccountStats {
   const accountTrades = trades.filter((t) => t.accountId === account.id);
-  const isFunded = account.status === 'Financiada';
-  const minDailyProfit = LUCIDFLEX_RULES[account.size].minDailyProfit;
-  const fundedTrades = isFunded && account.fundedAt
-    ? accountTrades.filter((t) => t.timestamp >= account.fundedAt!)
-    : isFunded ? accountTrades : [];
+
   const dayTotals = new Map<string, number>();
-  for (const t of fundedTrades) {
+  for (const t of accountTrades) {
     const key = operationalDay(t.timestamp);
     dayTotals.set(key, (dayTotals.get(key) || 0) + t.amount);
   }
-  const profitableDays = isFunded
-    ? Array.from(dayTotals.values()).filter((v) => v >= minDailyProfit).length
-    : 0;
+
+  const profitableDays = Array.from(dayTotals.values()).filter((v) => v > 0).length;
   const totalAmount = accountTrades.reduce((s, t) => s + t.amount, 0);
   const targetValue = (SIZE_VALUES[account.size] * EVALUATION_TARGET_PCT[account.size]) / 100;
-  const progressPct = targetValue > 0 ? Math.min(100, Math.round((totalAmount / targetValue) * 100)) : 0;
-  return { profitableDays, profitableDaysTarget: PROFITABLE_DAYS_TARGET, progressPct, totalAmount };
+  const progressPct = targetValue > 0
+    ? Math.min(100, Math.max(0, Math.round((totalAmount / targetValue) * 100)))
+    : 0;
+
+  return {
+    profitableDays,
+    profitableDaysTarget: PROFITABLE_DAYS_TARGET,
+    progressPct,
+    totalAmount,
+  };
 }
