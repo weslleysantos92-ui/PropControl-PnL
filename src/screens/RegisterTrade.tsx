@@ -5,22 +5,19 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '@/store';
-import { ASSETS, CONTEXTS, TIMEFRAMES, type Account, type Asset, type Context, type Timeframe, type TradeResult } from '@/types';
+import { CONTEXTS, TIMEFRAMES, type Account, type Context, type Timeframe, type TradeResult } from '@/types';
 
 interface RegisterTradeProps {
   accountId: string;
   onBack: () => void;
-  onOpenDetails: () => void;
 }
 
 const gold = '#D4AF37';
-const panel = '#111115';
-const field = '#17171C';
 
-export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTradeProps) {
+export function RegisterTrade({ accountId, onBack }: RegisterTradeProps) {
   const { accounts, addTrade } = useApp();
   const account = accounts.find((a) => a.id === accountId);
-  const [asset, setAsset] = useState<Asset>('MNQ');
+  const [asset, setAsset] = useState('');
   const [context, setContext] = useState<Context>('Captura de Liquidez');
   const [timeframe, setTimeframe] = useState<Timeframe>('M5');
   const [result, setResult] = useState<TradeResult>('Take');
@@ -42,16 +39,16 @@ export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTrad
 
   const saveTrade = () => {
     const value = Number(amount.replace(',', '.'));
-    if (!Number.isFinite(value) || value <= 0) return;
+    const normalizedAsset = asset.trim().toUpperCase();
+    if (!normalizedAsset || !Number.isFinite(value) || value <= 0) return;
 
-    // O valor digitado é sempre positivo no formulário; o resultado define o sinal contábil.
     const signedAmount = result === 'Stop' ? -value : result === 'BE' ? 0 : value;
-    addTrade({ accountId: account.id, asset, context, timeframe, result, amount: signedAmount, note: note.trim() || undefined });
+    addTrade({ accountId: account.id, asset: normalizedAsset, context, timeframe, result, amount: signedAmount, note: note.trim() || undefined });
     onBack();
   };
 
   return (
-    <div className="register-trade mx-auto w-full max-w-[920px] px-4 pb-28 md:px-6" style={{ fontFamily: 'Manrope, Inter, sans-serif' }}>
+    <div className="register-trade mx-auto w-full max-w-[920px] px-4 pb-8 md:px-6" style={{ fontFamily: 'Manrope, Inter, sans-serif' }}>
       <div className="flex items-start justify-between pt-2 md:pt-4">
         <button onClick={onBack} aria-label="Voltar" className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#6D5410] bg-[#0D0D10] text-[#D4AF37] hover:bg-[#18140A]"><ArrowLeft size={24} /></button>
         <div className="text-center pt-0.5">
@@ -76,17 +73,13 @@ export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTrad
               <div className="border-l border-[#292930] pl-8"><span className="block text-xs text-[#777780]">Modelo</span><strong className="text-lg text-white">{account.size}</strong></div>
             </div>
           </div>
-          <button onClick={onOpenDetails} className="flex min-h-16 items-center justify-between gap-5 rounded-2xl border border-[#3A321B] bg-[#121216] px-5 py-3 text-left text-[#E7E7EA] hover:border-[#806615] md:w-[230px]">
-            <span className="flex items-center gap-3"><FileText size={26} className="text-[#D4AF37]" /><span className="text-sm font-semibold">Ver detalhes<br />da conta</span></span>
-            <ChevronRight size={20} className="text-[#A7A7AE]" />
-          </button>
         </div>
       </section>
 
       <section className="mt-5 rounded-[22px] border border-[#38331F] bg-[#101014] p-5 shadow-[0_15px_40px_rgba(0,0,0,.3)] md:p-7">
         <SectionTitle icon={<SlidersHorizontal size={23} />} title="Dados do Trade" />
         <div className="mt-6 grid gap-5 md:grid-cols-3">
-          <FieldSelect icon={<Globe2 size={22} />} label="Ativo" value={asset} onChange={(v) => setAsset(v as Asset)} options={ASSETS} />
+          <FieldText icon={<Globe2 size={22} />} label="Ativo" value={asset} onChange={setAsset} placeholder="Ex.: XAUUSD, BTCUSD, EURUSD" />
           <FieldSelect icon={<Crosshair size={22} />} label="Contexto" value={context} onChange={(v) => setContext(v as Context)} options={CONTEXTS} />
           <FieldSelect icon={<Clock3 size={22} />} label="Timeframe" value={timeframe} onChange={(v) => setTimeframe(v as Timeframe)} options={TIMEFRAMES} />
         </div>
@@ -119,7 +112,7 @@ export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTrad
         </label>
       </section>
 
-      <button onClick={saveTrade} disabled={!amount || Number(amount.replace(',', '.')) <= 0} className="mt-5 flex h-20 w-full items-center justify-center gap-4 rounded-full bg-gradient-to-r from-[#D49A13] via-[#F0C348] to-[#D49A13] text-xl font-black tracking-wide text-[#080808] shadow-[0_8px_30px_rgba(212,175,55,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+      <button onClick={saveTrade} disabled={!asset.trim() || !amount || Number(amount.replace(',', '.')) <= 0} className="mt-5 flex h-20 w-full items-center justify-center gap-4 rounded-full bg-gradient-to-r from-[#D49A13] via-[#F0C348] to-[#D49A13] text-xl font-black tracking-wide text-[#080808] shadow-[0_8px_30px_rgba(212,175,55,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
         <Save size={27} /> SALVAR TRADE
       </button>
 
@@ -133,6 +126,10 @@ export function RegisterTrade({ accountId, onBack, onOpenDetails }: RegisterTrad
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return <div className="flex items-center gap-3 text-[21px] font-extrabold text-[#D4AF37]"><span>{icon}</span><span>{title}</span><span className="ml-2 h-px flex-1 bg-[#4A3D17]" /></div>;
+}
+
+function FieldText({ icon, label, value, onChange, placeholder }: { icon: React.ReactNode; label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return <label className="block"><span className="mb-3 flex items-center gap-3 text-base text-[#C6C6CB]">{icon}<span>{label}</span></span><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-16 w-full rounded-2xl border border-[#303036] bg-[#17171C] px-5 text-lg font-semibold uppercase text-white outline-none placeholder:normal-case placeholder:font-normal placeholder:text-[#55555E] focus:border-[#806615]" /></label>;
 }
 
 function FieldSelect({ icon, label, value, onChange, options }: { icon: React.ReactNode; label: string; value: string; onChange: (v: string) => void; options: readonly string[] }) {
