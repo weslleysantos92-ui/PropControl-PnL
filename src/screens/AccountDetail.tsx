@@ -12,7 +12,7 @@ const PNL_RULES: Record<string, { capital:number; target:number; drawdown:number
   '150K': { capital:150000, target:9000, drawdown:9000, floor:141000, daily:4500 },
 };
 
-export function AccountDetail({ accountId, onBack }: { accountId:string; onBack:()=>void }) {
+export function AccountDetail({ accountId, onBack, onRegisterTrade }: { accountId:string; onBack:()=>void; onRegisterTrade:(id:string)=>void }) {
   const { accounts, trades, setAccountStatus, deleteAccount } = useApp();
   const [confirmDelete,setConfirmDelete]=useState(false);
   const account=accounts.find(a=>a.id===accountId);
@@ -26,6 +26,7 @@ export function AccountDetail({ accountId, onBack }: { accountId:string; onBack:
       <Performance trades={accountTrades}/>
       <StatusPanel account={account} onChange={s=>setAccountStatus(accountId,s)}/>
       <TradeHistory trades={accountTrades}/>
+      <button onClick={()=>onRegisterTrade(accountId)} className="mx-auto flex items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/50 bg-gradient-to-r from-[#8E6B12] via-[#D4AF37] to-[#9A7617] px-8 py-4 text-sm font-black uppercase tracking-[0.14em] text-black shadow-[0_8px_25px_rgba(212,175,55,.18)] transition hover:brightness-110 active:scale-[0.99]"><CircleDollarSign size={18}/>Registrar Trade</button>
       <button aria-label="Excluir conta" onClick={()=>setConfirmDelete(true)} className="mx-auto block p-3 rounded-full text-gray-600 hover:text-red-400 hover:bg-red-500/5"><Trash2 size={19}/></button>
     </main>
     {confirmDelete&&<div className="fixed inset-0 z-50 bg-black/70 grid place-items-center p-4"><div className="w-full max-w-md rounded-3xl bg-[#15151B] border border-[#2B2B34] p-6"><AlertTriangle className="text-red-400 mb-3"/><h3 className="text-lg font-bold">Excluir conta?</h3><p className="text-sm text-gray-500 mt-1 mb-5">A conta e seus trades serão removidos.</p><button onClick={()=>{deleteAccount(accountId);onBack()}} className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-bold mb-2">Sim, excluir conta</button><button onClick={()=>setConfirmDelete(false)} className="w-full py-3.5 rounded-2xl bg-[#22222A] text-white">Cancelar</button></div></div>}
@@ -51,17 +52,11 @@ function RiskPanel({account,trades}:{account:Account;trades:Trade[]}){
   const progressPct=funded?Math.min(100,Math.max(0,pnl/r.drawdown*100)):Math.min(100,Math.max(0,pnl/r.target*100));
   const cushionPct=funded?Math.min(100,Math.max(0,pnl)/r.drawdown*100):0;
   const excessPct=funded&&pnl>r.drawdown?Math.min(100,(pnl-r.drawdown)/r.drawdown*100):0;
-  const consistencyOk=(funded?proConsistency:challengeConsistency)<=(funded?50:50)&&(funded?availableForPayout:1)>0;
+  const consistencyOk=(funded?proConsistency:challengeConsistency)<=50&&(funded?availableForPayout:1)>0;
   return <section className="pc-primary-card rounded-3xl border border-[#27272F] bg-[#111116] p-5 md:p-6">
     <div className="flex items-center justify-between gap-3 mb-5"><div><h3 className="font-bold text-lg">Margem de Risco e Metas</h3><p className="text-xs text-gray-500 mt-1">Drawdown máximo estático</p></div></div>
-
     <div className="mb-2 flex items-center justify-between gap-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Saldo atual</span><span className="text-base font-black text-white">{formatCurrency(balance)}</span></div>
-    <div className="relative h-14 rounded-2xl bg-[#17171D] border border-[#303039] overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,.5)]">
-      <div className="absolute inset-y-0 left-1/2 w-px bg-[#777]/60 z-20"/>
-      <div className="absolute inset-y-2 left-1/2 rounded-l-xl bg-gradient-to-l from-red-500/80 to-red-600/40 transition-all duration-500" style={{width:`${riskPct/2}%`,transform:'translateX(-100%)'}}/>
-      {!funded?<div className="absolute inset-y-2 left-1/2 rounded-r-xl bg-gradient-to-r from-blue-500/70 to-blue-400/40 transition-all duration-500" style={{width:`${progressPct/2}%`}}/>:<><div className="absolute inset-y-2 left-1/2 rounded-r-xl bg-gradient-to-r from-emerald-500/80 to-emerald-400/45 transition-all duration-500" style={{width:`${cushionPct/2}%`}}/>{excessPct>0&&<div className="absolute inset-y-2 bg-gradient-to-r from-[#A98719] via-[#D4AF37] to-[#FFE58A] transition-all duration-700 animate-[pulse_2.8s_ease-in-out_infinite]" style={{left:`${50+cushionPct/2}%`,width:`${excessPct/2}%`,boxShadow:'0 0 18px rgba(212,175,55,.55)'}}/>}</>}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/10 via-transparent to-black/10"/>
-    </div>
+    <div className="relative h-14 rounded-2xl bg-[#17171D] border border-[#303039] overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,.5)]"><div className="absolute inset-y-0 left-1/2 w-px bg-[#777]/60 z-20"/><div className="absolute inset-y-2 left-1/2 rounded-l-xl bg-gradient-to-l from-red-500/80 to-red-600/40 transition-all duration-500" style={{width:`${riskPct/2}%`,transform:'translateX(-100%)'}}/>{!funded?<div className="absolute inset-y-2 left-1/2 rounded-r-xl bg-gradient-to-r from-blue-500/70 to-blue-400/40 transition-all duration-500" style={{width:`${progressPct/2}%`}}/>:<><div className="absolute inset-y-2 left-1/2 rounded-r-xl bg-gradient-to-r from-emerald-500/80 to-emerald-400/45 transition-all duration-500" style={{width:`${cushionPct/2}%`}}/>{excessPct>0&&<div className="absolute inset-y-2 bg-gradient-to-r from-[#A98719] via-[#D4AF37] to-[#FFE58A] transition-all duration-700 animate-[pulse_2.8s_ease-in-out_infinite]" style={{left:`${50+cushionPct/2}%`,width:`${excessPct/2}%`,boxShadow:'0 0 18px rgba(212,175,55,.55)'}}/>}</>}</div>
     <div className="grid grid-cols-2 gap-4 mt-3 text-xs"><div><span className="text-gray-500">Margem disponível</span><p className="font-bold text-red-300">{formatCurrency(marginRemaining)}</p></div><div className="text-right"><span className="text-gray-500">{funded?'Lucro real sacável':'Distância até o Alvo'}</span><p className="font-bold text-[#D4AF37]">{funded?formatCurrency(Math.max(0,pnl-r.drawdown)):formatCurrency(Math.max(0,r.target-pnl))}</p></div></div>
     {funded&&<div className="grid grid-cols-3 gap-2 mt-3 text-[10px] uppercase tracking-wider"><span className="text-red-300">Drawdown</span><span className="text-center text-emerald-300">Colchão</span><span className="text-right text-[#D4AF37]">Lucro sacável</span></div>}
     <div className="mt-5 grid sm:grid-cols-2 gap-3"><Info label="Meta / Colchão" value={formatCurrency(r.target)} icon={Target}/><Info label="Drawdown Total" value={formatCurrency(r.drawdown)} icon={Shield}/>{funded&&<Info label="Limite de Perda Diária" value={`-${formatCurrency(r.daily)}`} icon={AlertTriangle}/>}<Info label="Dias Positivos" value={`${positiveDays} / 5`} icon={CalendarDays}/></div>
