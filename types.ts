@@ -1,13 +1,13 @@
 export type AccountSize = '25K' | '50K' | '100K' | '150K';
 export type AccountStatus = 'Avaliacao' | 'Financiada' | 'Reprovada';
-export type Asset = 'MNQ' | 'NQ' | 'MGC' | 'GC';
+export type Asset = string;
 export type Context =
   | 'Captura de Liquidez'
   | 'Inversão de Fluxo'
   | 'Estrutura Wyckoff'
   | 'Região Macro/Micro'
   | 'Rompimento';
-export type Timeframe = 'M1' | 'M5' | 'M15';
+export type Timeframe = 'M1' | 'M2' | 'M3' | 'M5' | 'M15';
 export type TradeResult = 'Take' | 'Stop' | 'BE';
 export type MovementType = 'investimento' | 'saque';
 
@@ -49,7 +49,7 @@ export interface AppData {
   seeded: boolean;
 }
 
-export const ASSETS: Asset[] = ['MNQ', 'NQ', 'MGC', 'GC'];
+export const ASSETS: string[] = ['MNQ', 'NQ', 'MGC', 'GC'];
 export const CONTEXTS: Context[] = [
   'Captura de Liquidez',
   'Inversão de Fluxo',
@@ -57,7 +57,7 @@ export const CONTEXTS: Context[] = [
   'Região Macro/Micro',
   'Rompimento',
 ];
-export const TIMEFRAMES: Timeframe[] = ['M1', 'M5', 'M15'];
+export const TIMEFRAMES: Timeframe[] = ['M1', 'M2', 'M3', 'M5', 'M15'];
 export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
 export const ACCOUNT_SIZES: AccountSize[] = ['25K', '50K', '100K', '150K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
