@@ -23,6 +23,8 @@ export function RegisterTrade({ accountId, onBack }: RegisterTradeProps) {
   const [result, setResult] = useState<TradeResult>('Take');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const displayName = useMemo(() => {
     if (!account) return 'PNL GLOBAL';
@@ -37,18 +39,25 @@ export function RegisterTrade({ accountId, onBack }: RegisterTradeProps) {
     );
   }
 
-  const saveTrade = () => {
+  const saveTrade = async () => {
     const value = Number(amount.replace(',', '.'));
     const normalizedAsset = asset.trim().toUpperCase();
-    if (!normalizedAsset || !Number.isFinite(value) || value <= 0) return;
+    if (!normalizedAsset || !Number.isFinite(value) || value <= 0 || saving) return;
 
+    setSaving(true);
+    setSaveError('');
     const signedAmount = result === 'Stop' ? -value : result === 'BE' ? 0 : value;
-    addTrade({ accountId: account.id, asset: normalizedAsset, context, timeframe, result, amount: signedAmount, note: note.trim() || undefined });
+    const response = await addTrade({ accountId: account.id, asset: normalizedAsset, context, timeframe, result, amount: signedAmount, note: note.trim() || undefined });
+    if (!response.ok) {
+      setSaveError(`Não foi possível salvar o trade. ${response.error || 'Verifique a conexão com o banco de dados.'}`);
+      setSaving(false);
+      return;
+    }
     onBack();
   };
 
   return (
-    <div className="register-trade mx-auto w-full max-w-[920px] px-4 pb-8 md:px-6" style={{ fontFamily: 'Manrope, Inter, sans-serif' }}>
+    <div className="register-trade mx-auto w-full max-w-[920px] px-4 pb-8" style={{ fontFamily: 'Manrope, Inter, sans-serif' }}>
       <div className="flex items-start justify-between pt-2 md:pt-4">
         <button onClick={onBack} aria-label="Voltar" className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#6D5410] bg-[#0D0D10] text-[#D4AF37] hover:bg-[#18140A]"><ArrowLeft size={24} /></button>
         <div className="text-center pt-0.5">
@@ -112,8 +121,9 @@ export function RegisterTrade({ accountId, onBack }: RegisterTradeProps) {
         </label>
       </section>
 
-      <button onClick={saveTrade} disabled={!asset.trim() || !amount || Number(amount.replace(',', '.')) <= 0} className="mt-5 flex h-20 w-full items-center justify-center gap-4 rounded-full bg-gradient-to-r from-[#D49A13] via-[#F0C348] to-[#D49A13] text-xl font-black tracking-wide text-[#080808] shadow-[0_8px_30px_rgba(212,175,55,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
-        <Save size={27} /> SALVAR TRADE
+      {saveError && <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-5 text-red-300">{saveError}</div>}
+      <button onClick={saveTrade} disabled={saving || !asset.trim() || !amount || Number(amount.replace(',', '.')) <= 0} className="mt-5 flex h-20 w-full items-center justify-center gap-4 rounded-full bg-gradient-to-r from-[#D49A13] via-[#F0C348] to-[#D49A13] text-xl font-black tracking-wide text-[#080808] shadow-[0_8px_30px_rgba(212,175,55,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+        <Save size={27} /> {saving ? 'SALVANDO...' : 'SALVAR TRADE'}
       </button>
 
       <div className="mt-5 flex items-center gap-4 rounded-[22px] border border-[#303036] bg-[#121216] p-5 text-[#B7B7BE]">
