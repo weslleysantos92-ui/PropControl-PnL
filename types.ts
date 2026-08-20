@@ -11,6 +11,21 @@ export type Timeframe = 'M1' | 'M2' | 'M3' | 'M5' | 'M15';
 export type TradeResult = 'Take' | 'Stop' | 'BE';
 export type MovementType = 'investimento' | 'saque';
 
+export interface AccountRuleSnapshot {
+  target?: number;
+  targetPct?: number;
+  drawdownType?: 'Estático' | 'EOD';
+  maxDrawdown?: number;
+  dailyLoss?: number;
+  consistencyEnabled?: boolean;
+  consistencyPct?: number;
+  profitableDaysEnabled?: boolean;
+  profitableDays?: number;
+  profitableDayPct?: number;
+  cushionEnabled?: boolean;
+  cushion?: number;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -20,6 +35,11 @@ export interface Account {
   createdAt: number;
   queueOrder: number;
   fundedAt?: number;
+  propFirmName?: string;
+  propProgramName?: string;
+  propProgramId?: string;
+  currentPhase: number;
+  rulesSnapshot?: AccountRuleSnapshot[];
 }
 
 export interface Trade {
@@ -50,42 +70,17 @@ export interface AppData {
 }
 
 export const ASSETS: string[] = ['MNQ', 'NQ', 'MGC', 'GC'];
-export const CONTEXTS: Context[] = [
-  'Captura de Liquidez',
-  'Inversão de Fluxo',
-  'Estrutura Wyckoff',
-  'Região Macro/Micro',
-  'Rompimento',
-];
+export const CONTEXTS: Context[] = ['Captura de Liquidez', 'Inversão de Fluxo', 'Estrutura Wyckoff', 'Região Macro/Micro', 'Rompimento'];
 export const TIMEFRAMES: Timeframe[] = ['M1', 'M2', 'M3', 'M5', 'M15'];
 export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
 export const ACCOUNT_SIZES: AccountSize[] = ['25K', '50K', '100K', '150K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
 
-export const SIZE_VALUES: Record<AccountSize, number> = {
-  '25K': 25000,
-  '50K': 50000,
-  '100K': 100000,
-  '150K': 150000,
-};
-
-export const EVALUATION_TARGET_PCT: Record<AccountSize, number> = {
-  '25K': 6,
-  '50K': 6,
-  '100K': 6,
-  '150K': 6,
-};
-
+export const SIZE_VALUES: Record<AccountSize, number> = { '25K': 25000, '50K': 50000, '100K': 100000, '150K': 150000 };
+export const EVALUATION_TARGET_PCT: Record<AccountSize, number> = { '25K': 6, '50K': 6, '100K': 6, '150K': 6 };
 export const PROFITABLE_DAYS_TARGET = 5;
 
-export interface PnLRule {
-  capital: number;
-  target: number;
-  drawdown: number;
-  floor: number;
-  daily: number;
-}
-
+export interface PnLRule { capital: number; target: number; drawdown: number; floor: number; daily: number; }
 export const PNL_RULES: Record<AccountSize, PnLRule> = {
   '25K': { capital: 25000, target: 1500, drawdown: 1500, floor: 23500, daily: 750 },
   '50K': { capital: 50000, target: 3000, drawdown: 3000, floor: 47000, daily: 1500 },
@@ -93,14 +88,7 @@ export const PNL_RULES: Record<AccountSize, PnLRule> = {
   '150K': { capital: 150000, target: 9000, drawdown: 9000, floor: 141000, daily: 4500 },
 };
 
-export interface AccountColor {
-  soft: string;
-  text: string;
-  ring: string;
-  dot: string;
-  label: string;
-}
-
+export interface AccountColor { soft: string; text: string; ring: string; dot: string; label: string; }
 export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
   '25K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
   '50K': { soft: 'bg-size50-soft', text: 'text-size50-text', ring: 'ring-size50-ring', dot: 'bg-size50', label: 'Roxo Neon' },
@@ -108,12 +96,5 @@ export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
   '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
 
-export function getAccountColor(size: AccountSize): AccountColor {
-  return SIZE_COLORS[size];
-}
-
-export function getAccountPhaseLabel(status: AccountStatus): string {
-  if (status === 'Avaliacao') return 'Challenge';
-  if (status === 'Financiada') return 'Funded Pro';
-  return 'Reprovada';
-}
+export function getAccountColor(size: AccountSize): AccountColor { return SIZE_COLORS[size]; }
+export function getAccountPhaseLabel(status: AccountStatus): string { if (status === 'Avaliacao') return 'Challenge'; if (status === 'Financiada') return 'Funded Pro'; return 'Reprovada'; }
