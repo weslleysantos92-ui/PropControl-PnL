@@ -18,7 +18,7 @@ export function AccountDetail({ accountId, onBack, onRegisterTrade }: { accountI
   const account=accounts.find(a=>a.id===accountId);
   if(!account) return <div className="p-6 text-white"><button onClick={onBack}>Voltar</button><p className="mt-4 text-gray-500">Conta não encontrada.</p></div>;
   const accountTrades=trades.filter(t=>t.accountId===accountId);
-  return <div className="min-h-screen bg-[#0A0A0A] text-white pb-24">
+  return <div className="min-h-screen bg-[#0B0B0D] text-white pb-24">
     <main className="max-w-6xl mx-auto px-5 py-6 space-y-5">
       <button onClick={onBack} className="mb-1 w-10 h-10 rounded-xl bg-[#15151B] border border-[#2B2B34] grid place-items-center hover:border-[#D4AF37]"><ArrowLeft size={18}/></button>
       <PremiumCard account={account}/>
