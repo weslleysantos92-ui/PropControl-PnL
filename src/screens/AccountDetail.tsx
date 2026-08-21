@@ -48,11 +48,12 @@ function RiskPanel({account,trades}:{account:Account;trades:Trade[]}){
   const challengeConsistency=r.target>0?maxDay/r.target*100:0;
   const availableForPayout=Math.max(0,pnl-r.drawdown);
   const proConsistency=availableForPayout>0?maxDay/availableForPayout*100:0;
+  const consistencyLimit=funded?40:50;
   const riskPct=Math.min(100,lossUsed/r.drawdown*100);
   const progressPct=funded?Math.min(100,Math.max(0,pnl/r.drawdown*100)):Math.min(100,Math.max(0,pnl/r.target*100));
   const cushionPct=funded?Math.min(100,Math.max(0,pnl)/r.drawdown*100):0;
   const excessPct=funded&&pnl>r.drawdown?Math.min(100,(pnl-r.drawdown)/r.drawdown*100):0;
-  const consistencyOk=(funded?proConsistency:challengeConsistency)<=50&&(funded?availableForPayout:1)>0;
+  const consistencyOk=(funded?proConsistency:challengeConsistency)<=consistencyLimit&&(funded?availableForPayout:1)>0;
   return <section className="pc-primary-card rounded-3xl border border-[#27272F] bg-[#111116] p-5 md:p-6">
     <div className="flex items-center justify-between gap-3 mb-5"><div><h3 className="font-bold text-lg">Margem de Risco e Metas</h3><p className="text-xs text-gray-500 mt-1">Drawdown máximo estático</p></div></div>
     <div className="mb-2 flex items-center justify-between gap-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Saldo atual</span><span className="text-base font-black text-white">{formatCurrency(balance)}</span></div>
@@ -60,7 +61,7 @@ function RiskPanel({account,trades}:{account:Account;trades:Trade[]}){
     <div className="grid grid-cols-2 gap-4 mt-3 text-xs"><div><span className="text-gray-500">Margem disponível</span><p className="font-bold text-red-300">{formatCurrency(marginRemaining)}</p></div><div className="text-right"><span className="text-gray-500">{funded?'Lucro real sacável':'Distância até o Alvo'}</span><p className="font-bold text-[#D4AF37]">{funded?formatCurrency(Math.max(0,pnl-r.drawdown)):formatCurrency(Math.max(0,r.target-pnl))}</p></div></div>
     {funded&&<div className="grid grid-cols-3 gap-2 mt-3 text-[10px] uppercase tracking-wider"><span className="text-red-300">Drawdown</span><span className="text-center text-emerald-300">Colchão</span><span className="text-right text-[#D4AF37]">Lucro sacável</span></div>}
     <div className="mt-5 grid sm:grid-cols-2 gap-3"><Info label="Meta / Colchão" value={formatCurrency(r.target)} icon={Target}/><Info label="Drawdown Total" value={formatCurrency(r.drawdown)} icon={Shield}/>{funded&&<Info label="Limite de Perda Diária" value={`-${formatCurrency(r.daily)}`} icon={AlertTriangle}/>}<Info label="Dias Positivos" value={`${positiveDays} / 5`} icon={CalendarDays}/></div>
-    <div className="mt-4 rounded-2xl border border-[#27272F] bg-[#0D0D11] p-4"><div className="flex items-center justify-between gap-3"><span className="text-xs text-gray-400">Consistência · 50%</span><span className={`text-xs font-bold ${consistencyOk?'text-emerald-400':'text-amber-400'}`}>{consistencyOk?<><Check size={14} className="inline mr-1"/>Dentro da regra</>:<>● Concentração Alta. Opere mais dias para diluir.</>}</span></div><p className="text-[11px] text-gray-600 mt-2">Maior dia: {formatCurrency(maxDay)} · {funded?'Base disponível para saque: '+formatCurrency(availableForPayout):'Meta: '+formatCurrency(r.target)}</p></div>
+    <div className="mt-4 rounded-2xl border border-[#27272F] bg-[#0D0D11] p-4"><div className="flex items-center justify-between gap-3"><span className="text-xs text-gray-400">Consistência · {consistencyLimit}%</span><span className={`text-xs font-bold ${consistencyOk?'text-emerald-400':'text-amber-400'}`}>{consistencyOk?<><Check size={14} className="inline mr-1"/>Dentro da regra</>:<>● Concentração Alta. Opere mais dias para diluir.</>}</span></div><p className="text-[11px] text-gray-600 mt-2">Maior dia: {formatCurrency(maxDay)} · {funded?'Base disponível para saque: '+formatCurrency(availableForPayout):'Meta: '+formatCurrency(r.target)}</p></div>
   </section>
 }
 function Info({label,value,icon:Icon}:{label:string;value:string;icon:any}){return <div className="pc-stat-card rounded-2xl border border-[#27272F] bg-[#0E0E12] p-3"><div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-600"><Icon size={14}/>{label}</div><p className="mt-2 text-sm font-bold text-white">{value}</p></div>}
