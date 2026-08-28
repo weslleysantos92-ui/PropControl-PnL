@@ -8,16 +8,7 @@ import { useAuth } from '@/lib/auth';
 interface NewAccountInput { name: string; code: string; size: AccountSize; }
 interface NewTradeInput { accountId: string; asset: Trade['asset']; context: Trade['context']; timeframe: Trade['timeframe']; result: Trade['result']; amount: number; note?: string; }
 interface NewMovementInput { type: MovementType; amount: number; description: string; }
-interface AppContextValue {
-  data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean;
-  addAccount: (input: NewAccountInput) => void;
-  addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>;
-  setAccountStatus: (id: string, status: AccountStatus) => void;
-  addMovement: (input: NewMovementInput) => void;
-  deleteMovement: (id: string) => void;
-  deleteTrade: (id: string) => void;
-  deleteAccount: (id: string) => void;
-}
+interface AppContextValue { data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean; addAccount: (input: NewAccountInput) => void; addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>; setAccountStatus: (id: string, status: AccountStatus) => void; addMovement: (input: NewMovementInput) => void; deleteMovement: (id: string) => void; deleteTrade: (id: string) => void; deleteAccount: (id: string) => void; }
 const AppContext = createContext<AppContextValue | null>(null);
 const EMPTY_DATA: AppData = { accounts: [], trades: [], movements: [], seeded: true };
 
@@ -31,20 +22,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [accRes, tradeRes, movRes] = await Promise.all([
-        supabase.from('accounts').select('*'),
-        supabase.from('trades').select('*'),
-        supabase.from('movements').select('*')
-      ]);
+      const [accRes, tradeRes, movRes] = await Promise.all([supabase.from('accounts').select('*'), supabase.from('trades').select('*'), supabase.from('movements').select('*')]);
       if (cancelled) return;
       const accounts = (accRes.data || []).map(rowToAccount);
       const trades = (tradeRes.data || []).map(rowToTrade);
       const movements = (movRes.data || []).map(rowToMovement);
-      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) {
-        const seeded = seedData();
-        await seedToSupabase(seeded);
-        if (!cancelled) setData(seeded);
-      } else setData({ accounts, trades, movements, seeded: true });
+      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) { const seeded = seedData(); await seedToSupabase(seeded); if (!cancelled) setData(seeded); }
+      else setData({ accounts, trades, movements, seeded: true });
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -64,10 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const addAccount: AppContextValue['addAccount'] = input => {
       const status: AccountStatus = 'Avaliacao';
       const maxOrder = data.accounts.length ? Math.max(...data.accounts.map(a => a.queueOrder)) : -1;
-      const acc: Account = {
-        id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size,
-        status, propFirm: 'FundingPips', phase: 1, createdAt: Date.now(), queueOrder: maxOrder + 1
-      };
+      const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: 'FundingPips', phase: 1, createdAt: Date.now(), queueOrder: maxOrder + 1 };
       setData(prev => ({ ...prev, accounts: [...prev.accounts, acc] }));
       supabase.from('accounts').insert(accountToRow(acc)).then(({ error }) => { if (error) console.error('Erro ao salvar conta:', error); });
     };
@@ -75,52 +56,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const addTrade: AppContextValue['addTrade'] = async input => {
       const account = data.accounts.find(a => a.id === input.accountId);
       if (!account) return { ok: false, error: 'Conta não encontrada.' };
-
-      // The trade belongs to the state that was active when it was recorded.
-      // This is what makes Phase 1, Phase 2 and Master independent cycles.
       const tradePhase: AccountPhase = account.status === 'Financiada' ? 0 : account.phase === 2 ? 2 : 1;
-      const trade: Trade = {
-        id: crypto.randomUUID(), accountId: input.accountId, asset: input.asset,
-        context: input.context, timeframe: input.timeframe, result: input.result,
-        amount: input.amount, note: input.note, timestamp: Date.now(), phase: tradePhase
-      };
-
+      const trade: Trade = { id: crypto.randomUUID(), accountId: input.accountId, asset: input.asset, context: input.context, timeframe: input.timeframe, result: input.result, amount: input.amount, note: input.note, timestamp: Date.now(), phase: tradePhase };
       const allTrades = [...data.trades, trade];
-      const lifecycle = account.status === 'Avaliacao' || account.status === 'Financiada'
+      const lifecycle = account.status === 'Avaliacao'
         ? deriveEvaluationState(account, allTrades)
-        : { status: account.status, phase: account.phase ?? 1 };
-
-      const updatedAccount = {
-        ...account,
-        status: lifecycle.status,
-        phase: lifecycle.phase,
-        fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? trade.timestamp + 1) : undefined,
-      };
-
-      // One trade is one rotation event, regardless of phase or status.
+        : { status: account.status, phase: account.phase ?? 0 };
+      const updatedAccount = { ...account, status: lifecycle.status, phase: lifecycle.phase, fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? trade.timestamp + 1) : undefined };
       const accountsWithState = data.accounts.map(a => a.id === account.id ? updatedAccount : a);
       const accounts = rotateAccount(accountsWithState, account.id);
-
       const { error: tradeError } = await supabase.from('trades').insert(tradeToRow(trade));
       if (tradeError) return { ok: false, error: tradeError.message };
-
       const persisted = accounts.find(a => a.id === input.accountId);
       if (persisted) {
-        const { error } = await supabase.from('accounts').update({
-          queue_order: persisted.queueOrder,
-          status: persisted.status,
-          funded_at: persisted.fundedAt ?? null,
-          phase: persisted.phase ?? null,
-          prop_firm: persisted.propFirm ?? 'FundingPips'
-        }).eq('id', input.accountId);
+        const { error } = await supabase.from('accounts').update({ queue_order: persisted.queueOrder, status: persisted.status, funded_at: persisted.fundedAt ?? null, phase: persisted.phase ?? null, prop_firm: persisted.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
         if (error) console.error('Erro ao atualizar conta após trade:', error);
       }
-
-      setData(prev => ({
-        ...prev,
-        trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades],
-        accounts
-      }));
+      setData(prev => ({ ...prev, trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades], accounts }));
       return { ok: true };
     };
 
@@ -128,28 +80,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setData(prev => {
         const queue = prev.accounts.slice().sort((a, b) => a.queueOrder - b.queueOrder);
         const maxOrder = queue.length ? Math.max(...queue.map(a => a.queueOrder)) : -1;
-        const accounts = prev.accounts.map(a => a.id === id ? {
-          ...a,
-          status,
-          phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase,
-          queueOrder: maxOrder + 1,
-          fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined
-        } : a);
+        const accounts = prev.accounts.map(a => a.id === id ? { ...a, status, phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
         const updated = accounts.find(a => a.id === id);
         if (updated) supabase.from('accounts').update({ status: updated.status, phase: updated.phase ?? null, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id).then(({ error }) => { if (error) console.error('Erro ao atualizar conta:', error); });
         return { ...prev, accounts };
       });
     };
 
-    const addMovement: AppContextValue['addMovement'] = input => {
-      const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() };
-      setData(prev => ({ ...prev, movements: [movement, ...prev.movements] }));
-      supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); });
-    };
-    const deleteMovement: AppContextValue['deleteMovement'] = id => {
-      setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) }));
-      supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); });
-    };
+    const addMovement: AppContextValue['addMovement'] = input => { const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() }; setData(prev => ({ ...prev, movements: [movement, ...prev.movements] })); supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); }); };
+    const deleteMovement: AppContextValue['deleteMovement'] = id => { setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) })); supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
 
     const deleteTrade: AppContextValue['deleteTrade'] = id => {
       const target = data.trades.find(t => t.id === id);
@@ -157,36 +96,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remainingTrades = data.trades.filter(t => t.id !== id);
       const account = data.accounts.find(a => a.id === target.accountId);
       let accounts = data.accounts;
-
-      // Rebuild the account lifecycle from the remaining phase-tagged trades.
-      // Master trades (phase 0) never count toward evaluation progress.
-      if (account && account.status !== 'Reprovada') {
+      // Deleting a Master trade does not rewind the evaluation. Deleting a Phase 1/2 trade does.
+      if (account && account.status !== 'Reprovada' && (target.phase ?? 1) !== 0) {
         const lifecycle = deriveEvaluationState(account, remainingTrades);
-        const rebuilt = {
-          ...account,
-          status: lifecycle.status,
-          phase: lifecycle.phase,
-          fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? Date.now() + 1) : undefined,
-        };
+        const rebuilt = { ...account, status: lifecycle.status, phase: lifecycle.phase, fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? Date.now() + 1) : undefined };
         accounts = data.accounts.map(a => a.id === account.id ? rebuilt : a);
-        const { error } = await supabase.from('accounts').update({
-          status: rebuilt.status,
-          phase: rebuilt.phase,
-          funded_at: rebuilt.fundedAt ?? null,
-          queue_order: rebuilt.queueOrder,
-          prop_firm: rebuilt.propFirm ?? 'FundingPips'
-        }).eq('id', rebuilt.id);
+        const { error } = await supabase.from('accounts').update({ status: rebuilt.status, phase: rebuilt.phase, funded_at: rebuilt.fundedAt ?? null, queue_order: rebuilt.queueOrder, prop_firm: rebuilt.propFirm ?? 'FundingPips' }).eq('id', rebuilt.id);
         if (error) console.error('Erro ao recalcular conta após excluir trade:', error);
       }
-
       setData(prev => ({ ...prev, trades: remainingTrades, accounts }));
       supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir trade:', error); });
     };
 
-    const deleteAccount: AppContextValue['deleteAccount'] = id => {
-      setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) }));
-      supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); });
-    };
+    const deleteAccount: AppContextValue['deleteAccount'] = id => { setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) })); supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
     return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount };
   }, [data, loading, user]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
