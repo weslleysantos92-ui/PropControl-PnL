@@ -26,15 +26,15 @@ export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
 export const ACCOUNT_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K', '150K'];
 export const FUNDING_PIPS_FLEX_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
-
 export const SIZE_VALUES: Record<AccountSize, number> = { '5K': 5000, '10K': 10000, '25K': 25000, '50K': 50000, '100K': 100000, '150K': 150000 };
 export const EVALUATION_TARGET_PCT = { phase1: FUNDING_PIPS_2_STEP_FLEX.phases.phase1.profitTargetPct, phase2: FUNDING_PIPS_2_STEP_FLEX.phases.phase2.profitTargetPct } as const;
 export const PROFITABLE_DAYS_TARGET = 3;
 
-export interface PnLRule { capital: number; phase1Target: number; phase2Target: number; maxLoss: number; dailyLoss: number; floor: number; }
+export interface PnLRule { capital: number; phase1Target: number; phase2Target: number; maxLoss: number; dailyLoss: number; floor: number; target: number; drawdown: number; daily: number; }
 export const PNL_RULES: Record<AccountSize, PnLRule> = Object.fromEntries(ACCOUNT_SIZES.map(size => {
   const capital = SIZE_VALUES[size];
-  return [size, { capital, phase1Target: getFlexPhaseTarget(capital, 1), phase2Target: getFlexPhaseTarget(capital, 2), maxLoss: getFlexMaxLossLimit(capital), dailyLoss: getFlexDailyLossLimit(capital), floor: capital - getFlexMaxLossLimit(capital) }];
+  const phase1Target = getFlexPhaseTarget(capital, 1); const phase2Target = getFlexPhaseTarget(capital, 2); const maxLoss = getFlexMaxLossLimit(capital); const dailyLoss = getFlexDailyLossLimit(capital);
+  return [size, { capital, phase1Target, phase2Target, maxLoss, dailyLoss, floor: capital - maxLoss, target: phase1Target, drawdown: maxLoss, daily: dailyLoss }];
 })) as Record<AccountSize, PnLRule>;
 
 export interface AccountColor { soft: string; text: string; ring: string; dot: string; label: string; }
