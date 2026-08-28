@@ -5,9 +5,7 @@ import { operationalDay } from './dates';
 
 /** The rotation is global: evaluation and Master accounts share one queue. */
 export function getQueue(accounts: Account[], status?: AccountStatus): Account[] {
-  return accounts
-    .filter(a => !status || a.status === status)
-    .sort((a, b) => a.queueOrder - b.queueOrder);
+  return accounts.filter(a => !status || a.status === status).sort((a, b) => a.queueOrder - b.queueOrder);
 }
 
 export function nextAccountToOperate(accounts: Account[]): Account | null {
@@ -27,12 +25,7 @@ export function countFundedBySize(accounts: Account[], size: AccountSize): numbe
   return accounts.filter(a => a.size === size && a.status === 'Financiada').length;
 }
 
-export interface AccountStats {
-  profitableDays: number;
-  profitableDaysTarget: number;
-  progressPct: number;
-  totalAmount: number;
-}
+export interface AccountStats { profitableDays: number; profitableDaysTarget: number; progressPct: number; totalAmount: number; }
 
 export function getAccountStats(account: Account, trades: Trade[]): AccountStats {
   const phase = account.status === 'Avaliacao' && account.phase === 2 ? 2 : account.status === 'Avaliacao' ? 1 : 0;
@@ -51,25 +44,36 @@ export function getAccountStats(account: Account, trades: Trade[]): AccountStats
   return { profitableDays, profitableDaysTarget: 3, progressPct, totalAmount };
 }
 
+function phaseProfitableDays(accountSize: AccountSize, trades: Trade[], phase: 1 | 2): number {
+  const minimum = getFundingPipsProfitableDayMinimum(SIZE_VALUES[accountSize]);
+  const totals = new Map<string, number>();
+  for (const t of trades) {
+    if ((t.phase ?? 1) !== phase) continue;
+    const key = operationalDay(t.timestamp);
+    totals.set(key, (totals.get(key) || 0) + t.amount);
+  }
+  return Array.from(totals.values()).filter(v => v >= minimum).length;
+}
+
 /**
  * Rebuild evaluation status from phase-tagged trades.
- * Phase 1 and Phase 2 are independent cycles; Master trades (phase 0)
- * never affect evaluation progress. This makes trade deletion reversible.
+ * Each phase has its own target and 3 profitable-day requirement.
+ * Master trades (phase 0) never affect evaluation progress.
  */
 export function deriveEvaluationState(account: Account, trades: Trade[]): { status: AccountStatus; phase: AccountPhase } {
   if (account.status === 'Reprovada') return { status: 'Reprovada', phase: account.phase ?? 1 };
-  if (account.status === 'Financiada' && !trades.some(t => t.accountId === account.id && (t.phase ?? 1) === 0)) {
-    // A financed account with no Master trades may still be a valid Master created by the phase transition.
-    // Its state is still reconstructed from the evaluation history below.
-  }
-
   const capital = SIZE_VALUES[account.size];
   const accountTrades = trades.filter(t => t.accountId === account.id);
+
   const phase1Profit = accountTrades.filter(t => (t.phase ?? 1) === 1).reduce((s, t) => s + t.amount, 0);
-  if (phase1Profit < getFundingPipsPhaseTarget(capital, 1)) return { status: 'Avaliacao', phase: 1 };
+  const phase1Days = phaseProfitableDays(account.size, accountTrades, 1);
+  const phase1Complete = phase1Profit >= getFundingPipsPhaseTarget(capital, 1) && phase1Days >= 3;
+  if (!phase1Complete) return { status: 'Avaliacao', phase: 1 };
 
   const phase2Profit = accountTrades.filter(t => (t.phase ?? 1) === 2).reduce((s, t) => s + t.amount, 0);
-  if (phase2Profit < getFundingPipsPhaseTarget(capital, 2)) return { status: 'Avaliacao', phase: 2 };
+  const phase2Days = phaseProfitableDays(account.size, accountTrades, 2);
+  const phase2Complete = phase2Profit >= getFundingPipsPhaseTarget(capital, 2) && phase2Days >= 3;
+  if (!phase2Complete) return { status: 'Avaliacao', phase: 2 };
 
   return { status: 'Financiada', phase: 0 };
 }
