@@ -59,9 +59,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const tradePhase: AccountPhase = account.status === 'Financiada' ? 0 : account.phase === 2 ? 2 : 1;
       const trade: Trade = { id: crypto.randomUUID(), accountId: input.accountId, asset: input.asset, context: input.context, timeframe: input.timeframe, result: input.result, amount: input.amount, note: input.note, timestamp: Date.now(), phase: tradePhase };
       const allTrades = [...data.trades, trade];
-      const lifecycle = account.status === 'Avaliacao'
-        ? deriveEvaluationState(account, allTrades)
-        : { status: account.status, phase: account.phase ?? 0 };
+      const lifecycle = account.status === 'Avaliacao' ? deriveEvaluationState(account, allTrades) : { status: account.status, phase: account.phase ?? 0 };
       const updatedAccount = { ...account, status: lifecycle.status, phase: lifecycle.phase, fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? trade.timestamp + 1) : undefined };
       const accountsWithState = data.accounts.map(a => a.id === account.id ? updatedAccount : a);
       const accounts = rotateAccount(accountsWithState, account.id);
@@ -96,13 +94,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remainingTrades = data.trades.filter(t => t.id !== id);
       const account = data.accounts.find(a => a.id === target.accountId);
       let accounts = data.accounts;
-      // Deleting a Master trade does not rewind the evaluation. Deleting a Phase 1/2 trade does.
       if (account && account.status !== 'Reprovada' && (target.phase ?? 1) !== 0) {
         const lifecycle = deriveEvaluationState(account, remainingTrades);
         const rebuilt = { ...account, status: lifecycle.status, phase: lifecycle.phase, fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? Date.now() + 1) : undefined };
         accounts = data.accounts.map(a => a.id === account.id ? rebuilt : a);
-        const { error } = await supabase.from('accounts').update({ status: rebuilt.status, phase: rebuilt.phase, funded_at: rebuilt.fundedAt ?? null, queue_order: rebuilt.queueOrder, prop_firm: rebuilt.propFirm ?? 'FundingPips' }).eq('id', rebuilt.id);
-        if (error) console.error('Erro ao recalcular conta após excluir trade:', error);
+        supabase.from('accounts').update({ status: rebuilt.status, phase: rebuilt.phase, funded_at: rebuilt.fundedAt ?? null, queue_order: rebuilt.queueOrder, prop_firm: rebuilt.propFirm ?? 'FundingPips' }).eq('id', rebuilt.id).then(({ error }) => { if (error) console.error('Erro ao recalcular conta após excluir trade:', error); });
       }
       setData(prev => ({ ...prev, trades: remainingTrades, accounts }));
       supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir trade:', error); });
