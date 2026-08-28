@@ -6,7 +6,7 @@ import { rotateAccount } from './rotation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 
-interface NewAccountInput { name: string; code: string; size: AccountSize; rewardSplit: 85 | 95; }
+interface NewAccountInput { name: string; code: string; size: AccountSize; }
 interface NewTradeInput { accountId: string; asset: Trade['asset']; context: Trade['context']; timeframe: Trade['timeframe']; result: Trade['result']; amount: number; note?: string; }
 interface NewMovementInput { type: MovementType; amount: number; description: string; }
 interface AppContextValue { data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean; addAccount: (input: NewAccountInput) => void; addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>; setAccountStatus: (id: string, status: AccountStatus) => void; addMovement: (input: NewMovementInput) => void; deleteMovement: (id: string) => void; deleteTrade: (id: string) => void; deleteAccount: (id: string) => void; }
@@ -50,7 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const status: AccountStatus = 'Avaliacao';
       const sameCat = data.accounts.filter(a => a.status === status);
       const maxOrder = sameCat.length ? Math.max(...sameCat.map(a => a.queueOrder)) : -1;
-      const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: 'FundingPips', model: '2 Step Flex', phase: 1, rewardSplit: input.rewardSplit, createdAt: Date.now(), queueOrder: maxOrder + 1 };
+      const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: 'FundingPips', phase: 1, createdAt: Date.now(), queueOrder: maxOrder + 1 };
       setData(prev => ({ ...prev, accounts: [...prev.accounts, acc] }));
       supabase.from('accounts').insert(accountToRow(acc)).then(({ error }) => { if (error) console.error('Erro ao salvar conta:', error); });
     };
@@ -76,13 +76,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-
       const { error: tradeError } = await supabase.from('trades').insert(tradeToRow(trade));
       if (tradeError) return { ok: false, error: tradeError.message };
       const updatedAcc = accounts.find(a => a.id === input.accountId);
       if (updatedAcc) {
-        const { error } = await supabase.from('accounts').update({ queue_order: updatedAcc.queueOrder, status: updatedAcc.status, funded_at: updatedAcc.fundedAt ?? null, phase: updatedAcc.phase ?? null, reward_split: updatedAcc.rewardSplit ?? 85, model: updatedAcc.model ?? '2 Step Flex', prop_firm: updatedAcc.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
-        if (error) console.error('Erro ao atualizar conta:', error);
+        const { error } = await supabase.from('accounts').update({ queue_order: updatedAcc.queueOrder, status: updatedAcc.status, funded_at: updatedAcc.fundedAt ?? null, phase: updatedAcc.phase ?? null, prop_firm: updatedAcc.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
+        if (error) console.error('Erro ao atualizar conta após trade:', error);
       }
       setData(prev => ({ ...prev, trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades], accounts }));
       return { ok: true };
@@ -109,9 +108,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 }
 export function useApp(): AppContextValue { const ctx = useContext(AppContext); if (!ctx) throw new Error('useApp must be used within AppProvider'); return ctx; }
 
-interface AccountRow { id: string; name: string; code: string; size: string; status: string; prop_firm?: string; model?: string; phase?: number; reward_split?: number; queue_order: number; created_at: number; funded_at: number | null; }
-function rowToAccount(r: AccountRow): Account { return { id: r.id, name: r.name, code: r.code, size: r.size as AccountSize, status: r.status as AccountStatus, propFirm: r.prop_firm ?? 'FundingPips', model: (r.model as Account['model']) ?? '2 Step Flex', phase: (r.phase as AccountPhase) ?? (r.status === 'Financiada' ? 0 : 1), rewardSplit: r.reward_split === 95 ? 95 : 85, queueOrder: r.queue_order, createdAt: r.created_at, fundedAt: r.funded_at ?? undefined }; }
-function accountToRow(a: Account): AccountRow { return { id: a.id, name: a.name, code: a.code, size: a.size, status: a.status, prop_firm: a.propFirm ?? 'FundingPips', model: a.model ?? '2 Step Flex', phase: a.phase ?? (a.status === 'Financiada' ? 0 : 1), reward_split: a.rewardSplit ?? 85, queue_order: a.queueOrder, created_at: a.createdAt, funded_at: a.fundedAt ?? null }; }
+interface AccountRow { id: string; name: string; code: string; size: string; status: string; prop_firm?: string; phase?: number; queue_order: number; created_at: number; funded_at: number | null; }
+function rowToAccount(r: AccountRow): Account { return { id: r.id, name: r.name, code: r.code, size: r.size as AccountSize, status: r.status as AccountStatus, propFirm: r.prop_firm ?? 'FundingPips', phase: (r.phase as AccountPhase) ?? (r.status === 'Financiada' ? 0 : 1), queueOrder: r.queue_order, createdAt: r.created_at, fundedAt: r.funded_at ?? undefined }; }
+function accountToRow(a: Account): AccountRow { return { id: a.id, name: a.name, code: a.code, size: a.size, status: a.status, prop_firm: a.propFirm ?? 'FundingPips', phase: a.phase ?? (a.status === 'Financiada' ? 0 : 1), queue_order: a.queueOrder, created_at: a.createdAt, funded_at: a.fundedAt ?? null }; }
 interface TradeRow { id: string; account_id: string; asset: string; context: string; timeframe: string; result: string; amount: number; note: string | null; timestamp: number; }
 function rowToTrade(r: TradeRow): Trade { return { id: r.id, accountId: r.account_id, asset: r.asset, context: r.context as Trade['context'], timeframe: r.timeframe as Trade['timeframe'], result: r.result as Trade['result'], amount: Number(r.amount), note: r.note ?? undefined, timestamp: r.timestamp }; }
 function tradeToRow(t: Trade): TradeRow { return { id: t.id, account_id: t.accountId, asset: t.asset, context: t.context, timeframe: t.timeframe, result: t.result, amount: t.amount, note: t.note ?? null, timestamp: t.timestamp }; }
