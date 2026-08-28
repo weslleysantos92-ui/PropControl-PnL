@@ -26,7 +26,11 @@ export const ACCOUNT_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K', 
 export const FUNDING_PIPS_FLEX_SIZES: AccountSize[] = ['10K', '25K', '50K', '100K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
 export const SIZE_VALUES: Record<AccountSize, number> = { '5K': 5000, '10K': 10000, '25K': 25000, '50K': 50000, '100K': 100000, '150K': 150000 };
-export const EVALUATION_TARGET_PCT = { phase1: FUNDING_PIPS_RULES.phases.phase1.profitTargetPct, phase2: FUNDING_PIPS_RULES.phases.phase2.profitTargetPct } as const;
+
+export const EVALUATION_TARGET_PCT = Object.assign(
+  Object.fromEntries(FUNDING_PIPS_FLEX_SIZES.map(size => [size, FUNDING_PIPS_RULES.phases.phase1.profitTargetPct])) as Record<AccountSize, number>,
+  { phase1: FUNDING_PIPS_RULES.phases.phase1.profitTargetPct, phase2: FUNDING_PIPS_RULES.phases.phase2.profitTargetPct },
+);
 export const PROFITABLE_DAYS_TARGET = FUNDING_PIPS_RULES.minimumProfitableDays;
 
 export interface PnLRule { capital: number; phase1Target: number; phase2Target: number; maxLoss: number; floor: number; target: number; drawdown: number; }
