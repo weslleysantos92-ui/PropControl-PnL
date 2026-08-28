@@ -1,5 +1,9 @@
-export type AccountSize = '25K' | '50K' | '100K' | '150K';
+import { FUNDING_PIPS_2_STEP_FLEX, type FundingPipsRewardSplit, getFlexDailyLossLimit, getFlexMaxLossLimit, getFlexPhaseTarget } from './fundingPips2StepFlex';
+
+export type AccountSize = '5K' | '10K' | '25K' | '50K' | '100K' | '150K';
 export type AccountStatus = 'Avaliacao' | 'Financiada' | 'Reprovada';
+export type AccountPhase = 0 | 1 | 2;
+export type AccountModel = '2 Step Flex';
 export type Asset = string;
 export type Context =
   | 'Captura de Liquidez'
@@ -17,6 +21,9 @@ export interface Account {
   code: string;
   size: AccountSize;
   status: AccountStatus;
+  model?: AccountModel;
+  phase?: AccountPhase;
+  rewardSplit?: FundingPipsRewardSplit;
   createdAt: number;
   queueOrder: number;
   fundedAt?: number;
@@ -50,70 +57,68 @@ export interface AppData {
 }
 
 export const ASSETS: string[] = ['MNQ', 'NQ', 'MGC', 'GC'];
-export const CONTEXTS: Context[] = [
-  'Captura de Liquidez',
-  'Inversão de Fluxo',
-  'Estrutura Wyckoff',
-  'Região Macro/Micro',
-  'Rompimento',
-];
+export const CONTEXTS: Context[] = ['Captura de Liquidez', 'Inversão de Fluxo', 'Estrutura Wyckoff', 'Região Macro/Micro', 'Rompimento'];
 export const TIMEFRAMES: Timeframe[] = ['M1', 'M2', 'M3', 'M5', 'M15'];
 export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
-export const ACCOUNT_SIZES: AccountSize[] = ['25K', '50K', '100K', '150K'];
+export const ACCOUNT_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K', '150K'];
+export const FUNDING_PIPS_FLEX_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
 
 export const SIZE_VALUES: Record<AccountSize, number> = {
+  '5K': 5000,
+  '10K': 10000,
   '25K': 25000,
   '50K': 50000,
   '100K': 100000,
   '150K': 150000,
 };
 
-export const EVALUATION_TARGET_PCT: Record<AccountSize, number> = {
-  '25K': 6,
-  '50K': 6,
-  '100K': 6,
-  '150K': 6,
-};
+export const EVALUATION_TARGET_PCT = {
+  phase1: FUNDING_PIPS_2_STEP_FLEX.phases.phase1.profitTargetPct,
+  phase2: FUNDING_PIPS_2_STEP_FLEX.phases.phase2.profitTargetPct,
+} as const;
 
-export const PROFITABLE_DAYS_TARGET = 5;
+export const PROFITABLE_DAYS_TARGET = 3;
 
 export interface PnLRule {
   capital: number;
-  target: number;
-  drawdown: number;
+  phase1Target: number;
+  phase2Target: number;
+  maxLoss: number;
+  dailyLoss: number;
   floor: number;
-  daily: number;
 }
 
-export const PNL_RULES: Record<AccountSize, PnLRule> = {
-  '25K': { capital: 25000, target: 1500, drawdown: 1500, floor: 23500, daily: 750 },
-  '50K': { capital: 50000, target: 3000, drawdown: 3000, floor: 47000, daily: 1500 },
-  '100K': { capital: 100000, target: 6000, drawdown: 6000, floor: 94000, daily: 3000 },
-  '150K': { capital: 150000, target: 9000, drawdown: 9000, floor: 141000, daily: 4500 },
-};
+export const PNL_RULES: Record<AccountSize, PnLRule> = Object.fromEntries(
+  ACCOUNT_SIZES.map(size => {
+    const capital = SIZE_VALUES[size];
+    return [size, {
+      capital,
+      phase1Target: getFlexPhaseTarget(capital, 1),
+      phase2Target: getFlexPhaseTarget(capital, 2),
+      maxLoss: getFlexMaxLossLimit(capital),
+      dailyLoss: getFlexDailyLossLimit(capital),
+      floor: capital - getFlexMaxLossLimit(capital),
+    }];
+  })
+) as Record<AccountSize, PnLRule>;
 
-export interface AccountColor {
-  soft: string;
-  text: string;
-  ring: string;
-  dot: string;
-  label: string;
-}
+export interface AccountColor { soft: string; text: string; ring: string; dot: string; label: string; }
 
 export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
+  '5K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
+  '10K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
   '25K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
   '50K': { soft: 'bg-size50-soft', text: 'text-size50-text', ring: 'ring-size50-ring', dot: 'bg-size50', label: 'Roxo Neon' },
   '100K': { soft: 'bg-size100-soft', text: 'text-size100-text', ring: 'ring-size100-ring', dot: 'bg-size100', label: 'Laranja/Dourado' },
   '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
 
-export function getAccountColor(size: AccountSize): AccountColor {
-  return SIZE_COLORS[size];
-}
+export function getAccountColor(size: AccountSize): AccountColor { return SIZE_COLORS[size]; }
 
-export function getAccountPhaseLabel(status: AccountStatus): string {
-  if (status === 'Avaliacao') return 'Challenge';
-  if (status === 'Financiada') return 'Funded Pro';
-  return 'Reprovada';
+export function getAccountPhaseLabel(status: AccountStatus, phase?: AccountPhase): string {
+  if (status === 'Reprovada') return 'Reprovada';
+  if (status === 'Financiada') return 'Master Account';
+  if (phase === 2) return 'Fase 2';
+  return 'Fase 1';
 }
