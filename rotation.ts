@@ -1,26 +1,25 @@
-import type { Account, AccountSize, AccountStatus, Trade } from './types';
+import type { Account, AccountPhase, AccountSize, AccountStatus, Trade } from './types';
 import { SIZE_VALUES } from './types';
 import { getFundingPipsPhaseTarget, getFundingPipsProfitableDayMinimum } from './fundingPips2StepFlex';
 import { operationalDay } from './dates';
 
-export function getQueue(accounts: Account[], status: AccountStatus): Account[] {
-  return accounts.filter(a => a.status === status).sort((a, b) => a.queueOrder - b.queueOrder);
+/** The rotation is global: evaluation and Master accounts share one queue. */
+export function getQueue(accounts: Account[], status?: AccountStatus): Account[] {
+  return accounts
+    .filter(a => !status || a.status === status)
+    .sort((a, b) => a.queueOrder - b.queueOrder);
 }
 
 export function nextAccountToOperate(accounts: Account[]): Account | null {
-  const avaliacao = getQueue(accounts, 'Avaliacao');
-  if (avaliacao.length > 0) return avaliacao[0];
-  const financiada = getQueue(accounts, 'Financiada');
-  if (financiada.length > 0) return financiada[0];
-  return null;
+  return getQueue(accounts)[0] ?? null;
 }
 
 export function rotateAccount(accounts: Account[], accountId: string): Account[] {
   const acc = accounts.find(a => a.id === accountId);
   if (!acc) return accounts;
-  const sameCategory = accounts.filter(a => a.status === acc.status).sort((a, b) => a.queueOrder - b.queueOrder);
-  if (sameCategory.length <= 1) return accounts;
-  const maxOrder = Math.max(...sameCategory.map(a => a.queueOrder));
+  const queue = getQueue(accounts);
+  if (queue.length <= 1) return accounts;
+  const maxOrder = Math.max(...queue.map(a => a.queueOrder));
   return accounts.map(a => a.id === accountId ? { ...a, queueOrder: maxOrder + 1 } : a);
 }
 
@@ -36,7 +35,8 @@ export interface AccountStats {
 }
 
 export function getAccountStats(account: Account, trades: Trade[]): AccountStats {
-  const accountTrades = trades.filter(t => t.accountId === account.id);
+  const phase = account.status === 'Avaliacao' && account.phase === 2 ? 2 : account.status === 'Avaliacao' ? 1 : 0;
+  const accountTrades = trades.filter(t => t.accountId === account.id && (t.phase ?? 1) === phase);
   const capital = SIZE_VALUES[account.size];
   const profitableDayMinimum = getFundingPipsProfitableDayMinimum(capital);
   const dayTotals = new Map<string, number>();
@@ -46,9 +46,30 @@ export function getAccountStats(account: Account, trades: Trade[]): AccountStats
   }
   const profitableDays = Array.from(dayTotals.values()).filter(v => v >= profitableDayMinimum).length;
   const totalAmount = accountTrades.reduce((s, t) => s + t.amount, 0);
-  const phase = account.status === 'Avaliacao' && account.phase === 2 ? 2 : 1;
-  const targetValue = getFundingPipsPhaseTarget(capital, phase);
-  const progressBase = phase === 2 ? Math.max(0, totalAmount - getFundingPipsPhaseTarget(capital, 1)) : totalAmount;
-  const progressPct = targetValue > 0 ? Math.min(100, Math.max(0, Math.round((progressBase / targetValue) * 100))) : 0;
+  const targetValue = phase === 2 ? getFundingPipsPhaseTarget(capital, 2) : phase === 1 ? getFundingPipsPhaseTarget(capital, 1) : 0;
+  const progressPct = targetValue > 0 ? Math.min(100, Math.max(0, Math.round((totalAmount / targetValue) * 100))) : 0;
   return { profitableDays, profitableDaysTarget: 3, progressPct, totalAmount };
+}
+
+/**
+ * Rebuild evaluation status from phase-tagged trades.
+ * Phase 1 and Phase 2 are independent cycles; Master trades (phase 0)
+ * never affect evaluation progress. This makes trade deletion reversible.
+ */
+export function deriveEvaluationState(account: Account, trades: Trade[]): { status: AccountStatus; phase: AccountPhase } {
+  if (account.status === 'Reprovada') return { status: 'Reprovada', phase: account.phase ?? 1 };
+  if (account.status === 'Financiada' && !trades.some(t => t.accountId === account.id && (t.phase ?? 1) === 0)) {
+    // A financed account with no Master trades may still be a valid Master created by the phase transition.
+    // Its state is still reconstructed from the evaluation history below.
+  }
+
+  const capital = SIZE_VALUES[account.size];
+  const accountTrades = trades.filter(t => t.accountId === account.id);
+  const phase1Profit = accountTrades.filter(t => (t.phase ?? 1) === 1).reduce((s, t) => s + t.amount, 0);
+  if (phase1Profit < getFundingPipsPhaseTarget(capital, 1)) return { status: 'Avaliacao', phase: 1 };
+
+  const phase2Profit = accountTrades.filter(t => (t.phase ?? 1) === 2).reduce((s, t) => s + t.amount, 0);
+  if (phase2Profit < getFundingPipsPhaseTarget(capital, 2)) return { status: 'Avaliacao', phase: 2 };
+
+  return { status: 'Financiada', phase: 0 };
 }
