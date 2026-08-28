@@ -64,8 +64,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const phase: AccountPhase = account.phase === 2 ? 2 : 1;
         const accountTrades = [...data.trades, trade].filter(t => t.accountId === input.accountId);
         const totalProfit = accountTrades.reduce((sum, t) => sum + t.amount, 0);
-        const target = phase === 1 ? PNL_RULES[account.size].phase1Target : PNL_RULES[account.size].phase2Target;
-        if (totalProfit >= target) {
+        const phase1Target = PNL_RULES[account.size].phase1Target;
+        const target = phase === 1 ? phase1Target : PNL_RULES[account.size].phase2Target;
+        const phaseProfit = phase === 1 ? totalProfit : Math.max(0, totalProfit - phase1Target);
+        if (phaseProfit >= target) {
           if (phase === 1) {
             accounts = accounts.map(a => a.id === input.accountId ? { ...a, phase: 2 as AccountPhase } : a);
           } else {
