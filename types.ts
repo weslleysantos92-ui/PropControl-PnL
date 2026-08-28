@@ -14,7 +14,10 @@ export interface Account {
   propFirm?: string; phase?: AccountPhase;
   createdAt: number; queueOrder: number; fundedAt?: number;
 }
-export interface Trade { id: string; accountId: string; asset: Asset; context: Context; timeframe: Timeframe; result: TradeResult; amount: number; note?: string; timestamp: number; }
+export interface Trade {
+  id: string; accountId: string; asset: Asset; context: Context; timeframe: Timeframe;
+  result: TradeResult; amount: number; note?: string; timestamp: number; phase?: AccountPhase;
+}
 export interface Movement { id: string; type: MovementType; amount: number; description: string; timestamp: number; }
 export interface AppData { accounts: Account[]; trades: Trade[]; movements: Movement[]; seeded: boolean; }
 
@@ -52,4 +55,8 @@ export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
   '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
 export function getAccountColor(size: AccountSize): AccountColor { return SIZE_COLORS[size]; }
-export function getAccountPhaseLabel(status: AccountStatus, phase?: AccountPhase): string { if (status === 'Reprovada') return 'Reprovada'; if (status === 'Financiada') return 'Master Account'; return phase === 2 ? 'Fase 2' : 'Fase 1'; }
+export function getAccountPhaseLabel(status: AccountStatus, phase?: AccountPhase): string {
+  if (status === 'Reprovada') return 'Reprovada';
+  if (status === 'Financiada') return 'Master';
+  return phase === 2 ? 'Fase 2' : 'Fase 1';
+}
