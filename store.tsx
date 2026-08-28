@@ -1,16 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Account, AccountSize, AccountStatus, AppData, Movement, MovementType, Trade } from './types';
+import type { Account, AccountPhase, AccountSize, AccountStatus, AppData, Movement, MovementType, Trade } from './types';
 import { PNL_RULES } from './types';
 import { seedData } from './seed';
 import { rotateAccount } from './rotation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 
-interface NewAccountInput { name: string; code: string; size: AccountSize; }
+interface NewAccountInput { name: string; code: string; size: AccountSize; rewardSplit: 85 | 95; }
 interface NewTradeInput { accountId: string; asset: Trade['asset']; context: Trade['context']; timeframe: Trade['timeframe']; result: Trade['result']; amount: number; note?: string; }
 interface NewMovementInput { type: MovementType; amount: number; description: string; }
 interface AppContextValue { data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean; addAccount: (input: NewAccountInput) => void; addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>; setAccountStatus: (id: string, status: AccountStatus) => void; addMovement: (input: NewMovementInput) => void; deleteMovement: (id: string) => void; deleteTrade: (id: string) => void; deleteAccount: (id: string) => void; }
-
 const AppContext = createContext<AppContextValue | null>(null);
 const EMPTY_DATA: AppData = { accounts: [], trades: [], movements: [], seeded: true };
 
@@ -24,16 +23,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [accRes, tradeRes, movRes] = await Promise.all([
-        supabase.from('accounts').select('*'), supabase.from('trades').select('*'), supabase.from('movements').select('*'),
-      ]);
+      const [accRes, tradeRes, movRes] = await Promise.all([supabase.from('accounts').select('*'), supabase.from('trades').select('*'), supabase.from('movements').select('*')]);
       if (cancelled) return;
       const accounts = (accRes.data || []).map(rowToAccount);
       const trades = (tradeRes.data || []).map(rowToTrade);
       const movements = (movRes.data || []).map(rowToMovement);
-      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) {
-        const seeded = seedData(); await seedToSupabase(seeded); if (cancelled) return; setData(seeded);
-      } else setData({ accounts, trades, movements, seeded: true });
+      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) { const seeded = seedData(); await seedToSupabase(seeded); if (!cancelled) setData(seeded); }
+      else setData({ accounts, trades, movements, seeded: true });
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -54,7 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const status: AccountStatus = 'Avaliacao';
       const sameCat = data.accounts.filter(a => a.status === status);
       const maxOrder = sameCat.length ? Math.max(...sameCat.map(a => a.queueOrder)) : -1;
-      const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, createdAt: Date.now(), queueOrder: maxOrder + 1 };
+      const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: 'FundingPips', model: '2 Step Flex', phase: 1, rewardSplit: input.rewardSplit, createdAt: Date.now(), queueOrder: maxOrder + 1 };
       setData(prev => ({ ...prev, accounts: [...prev.accounts, acc] }));
       supabase.from('accounts').insert(accountToRow(acc)).then(({ error }) => { if (error) console.error('Erro ao salvar conta:', error); });
     };
@@ -65,29 +61,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let accounts = rotateAccount(data.accounts, input.accountId);
       let fundedAt: number | undefined;
       if (account && account.status === 'Avaliacao') {
+        const phase: AccountPhase = account.phase === 2 ? 2 : 1;
         const accountTrades = [...data.trades, trade].filter(t => t.accountId === input.accountId);
         const totalProfit = accountTrades.reduce((sum, t) => sum + t.amount, 0);
-        const target = PNL_RULES[account.size].target;
+        const target = phase === 1 ? PNL_RULES[account.size].phase1Target : PNL_RULES[account.size].phase2Target;
         if (totalProfit >= target) {
-          const fundedPeers = accounts.filter(a => a.status === 'Financiada' && a.id !== input.accountId);
-          const maxOrder = fundedPeers.length ? Math.max(...fundedPeers.map(a => a.queueOrder)) : -1;
-          fundedAt = trade.timestamp + 1;
-          accounts = accounts.map(a => a.id === input.accountId ? { ...a, status: 'Financiada' as AccountStatus, queueOrder: maxOrder + 1, fundedAt } : a);
+          if (phase === 1) {
+            accounts = accounts.map(a => a.id === input.accountId ? { ...a, phase: 2 as AccountPhase } : a);
+          } else {
+            const fundedPeers = accounts.filter(a => a.status === 'Financiada' && a.id !== input.accountId);
+            const maxOrder = fundedPeers.length ? Math.max(...fundedPeers.map(a => a.queueOrder)) : -1;
+            fundedAt = trade.timestamp + 1;
+            accounts = accounts.map(a => a.id === input.accountId ? { ...a, status: 'Financiada' as AccountStatus, phase: 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt } : a);
+          }
         }
       }
 
       const { error: tradeError } = await supabase.from('trades').insert(tradeToRow(trade));
-      if (tradeError) {
-        console.error('Erro ao salvar trade no Supabase:', tradeError);
-        return { ok: false, error: tradeError.message };
-      }
-
+      if (tradeError) return { ok: false, error: tradeError.message };
       const updatedAcc = accounts.find(a => a.id === input.accountId);
       if (updatedAcc) {
-        const { error: accountError } = await supabase.from('accounts').update({ queue_order: updatedAcc.queueOrder, status: updatedAcc.status, funded_at: updatedAcc.fundedAt ?? null }).eq('id', input.accountId);
-        if (accountError) console.error('Erro ao atualizar conta após trade:', accountError);
+        const { error } = await supabase.from('accounts').update({ queue_order: updatedAcc.queueOrder, status: updatedAcc.status, funded_at: updatedAcc.fundedAt ?? null, phase: updatedAcc.phase ?? null, reward_split: updatedAcc.rewardSplit ?? 85, model: updatedAcc.model ?? '2 Step Flex', prop_firm: updatedAcc.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
+        if (error) console.error('Erro ao atualizar conta:', error);
       }
-
       setData(prev => ({ ...prev, trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades], accounts }));
       return { ok: true };
     };
@@ -96,35 +92,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setData(prev => {
         const sameCat = prev.accounts.filter(a => a.status === status && a.id !== id);
         const maxOrder = sameCat.length ? Math.max(...sameCat.map(a => a.queueOrder)) : -1;
-        const accounts = prev.accounts.map(a => a.id === id ? { ...a, status, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
+        const accounts = prev.accounts.map(a => a.id === id ? { ...a, status, phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
         const updated = accounts.find(a => a.id === id);
-        if (updated) supabase.from('accounts').update({ status: updated.status, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id).then(({ error }) => { if (error) console.error('Erro ao atualizar conta:', error); });
+        if (updated) supabase.from('accounts').update({ status: updated.status, phase: updated.phase ?? null, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id).then(({ error }) => { if (error) console.error('Erro ao atualizar conta:', error); });
         return { ...prev, accounts };
       });
     };
 
-    const addMovement: AppContextValue['addMovement'] = input => {
-      const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() };
-      setData(prev => ({ ...prev, movements: [movement, ...prev.movements] }));
-      supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error('Erro ao salvar movimentação:', error); });
-    };
-    const deleteMovement: AppContextValue['deleteMovement'] = id => { setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) })); supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir movimentação:', error); }); };
-    const deleteTrade: AppContextValue['deleteTrade'] = id => { setData(prev => ({ ...prev, trades: prev.trades.filter(t => t.id !== id) })); supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir trade:', error); }); };
-    const deleteAccount: AppContextValue['deleteAccount'] = id => { setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) })); supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir conta:', error); }); };
-
+    const addMovement: AppContextValue['addMovement'] = input => { const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() }; setData(prev => ({ ...prev, movements: [movement, ...prev.movements] })); supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); }); };
+    const deleteMovement: AppContextValue['deleteMovement'] = id => { setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) })); supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
+    const deleteTrade: AppContextValue['deleteTrade'] = id => { setData(prev => ({ ...prev, trades: prev.trades.filter(t => t.id !== id) })); supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
+    const deleteAccount: AppContextValue['deleteAccount'] = id => { setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) })); supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
     return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount };
   }, [data, loading, user]);
-
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
-
 export function useApp(): AppContextValue { const ctx = useContext(AppContext); if (!ctx) throw new Error('useApp must be used within AppProvider'); return ctx; }
 
-interface AccountRow { id: string; name: string; code: string; size: string; status: string; queue_order: number; created_at: number; funded_at: number | null; }
-function rowToAccount(r: AccountRow): Account { return { id: r.id, name: r.name, code: r.code, size: r.size as AccountSize, status: r.status as AccountStatus, queueOrder: r.queue_order, createdAt: r.created_at, fundedAt: r.funded_at ?? undefined }; }
-function accountToRow(a: Account): AccountRow { return { id: a.id, name: a.name, code: a.code, size: a.size, status: a.status, queue_order: a.queueOrder, created_at: a.createdAt, funded_at: a.fundedAt ?? null }; }
+interface AccountRow { id: string; name: string; code: string; size: string; status: string; prop_firm?: string; model?: string; phase?: number; reward_split?: number; queue_order: number; created_at: number; funded_at: number | null; }
+function rowToAccount(r: AccountRow): Account { return { id: r.id, name: r.name, code: r.code, size: r.size as AccountSize, status: r.status as AccountStatus, propFirm: r.prop_firm ?? 'FundingPips', model: (r.model as Account['model']) ?? '2 Step Flex', phase: (r.phase as AccountPhase) ?? (r.status === 'Financiada' ? 0 : 1), rewardSplit: r.reward_split === 95 ? 95 : 85, queueOrder: r.queue_order, createdAt: r.created_at, fundedAt: r.funded_at ?? undefined }; }
+function accountToRow(a: Account): AccountRow { return { id: a.id, name: a.name, code: a.code, size: a.size, status: a.status, prop_firm: a.propFirm ?? 'FundingPips', model: a.model ?? '2 Step Flex', phase: a.phase ?? (a.status === 'Financiada' ? 0 : 1), reward_split: a.rewardSplit ?? 85, queue_order: a.queueOrder, created_at: a.createdAt, funded_at: a.fundedAt ?? null }; }
 interface TradeRow { id: string; account_id: string; asset: string; context: string; timeframe: string; result: string; amount: number; note: string | null; timestamp: number; }
-function rowToTrade(r: TradeRow): Trade { return { id: r.id, accountId: r.account_id, asset: r.asset as Trade['asset'], context: r.context as Trade['context'], timeframe: r.timeframe as Trade['timeframe'], result: r.result as Trade['result'], amount: Number(r.amount), note: r.note ?? undefined, timestamp: r.timestamp }; }
+function rowToTrade(r: TradeRow): Trade { return { id: r.id, accountId: r.account_id, asset: r.asset, context: r.context as Trade['context'], timeframe: r.timeframe as Trade['timeframe'], result: r.result as Trade['result'], amount: Number(r.amount), note: r.note ?? undefined, timestamp: r.timestamp }; }
 function tradeToRow(t: Trade): TradeRow { return { id: t.id, account_id: t.accountId, asset: t.asset, context: t.context, timeframe: t.timeframe, result: t.result, amount: t.amount, note: t.note ?? null, timestamp: t.timestamp }; }
 interface MovementRow { id: string; type: string; amount: number; description: string; timestamp: number; }
 function rowToMovement(r: MovementRow): Movement { return { id: r.id, type: r.type as MovementType, amount: Number(r.amount), description: r.description, timestamp: r.timestamp }; }
@@ -133,14 +122,8 @@ function movementToRow(m: Movement): MovementRow { return { id: m.id, type: m.ty
 type Payload = { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; old: Record<string, unknown> | null; new: Record<string, unknown> | null };
 function applyChange(prev: AppData, table: 'accounts' | 'trades' | 'movements', payload: Payload): AppData {
   const { eventType, old, new: newRec } = payload;
-  if (table === 'accounts') {
-    if (eventType === 'DELETE') { const id = (old as AccountRow | null)?.id; return id ? { ...prev, accounts: prev.accounts.filter(a => a.id !== id) } : prev; }
-    const acc = rowToAccount(newRec as unknown as AccountRow); if (eventType === 'INSERT') return prev.accounts.some(a => a.id === acc.id) ? prev : { ...prev, accounts: [...prev.accounts, acc] }; return { ...prev, accounts: prev.accounts.map(a => a.id === acc.id ? acc : a) };
-  }
-  if (table === 'trades') {
-    if (eventType === 'DELETE') { const id = (old as TradeRow | null)?.id; return id ? { ...prev, trades: prev.trades.filter(t => t.id !== id) } : prev; }
-    const trade = rowToTrade(newRec as unknown as TradeRow); if (eventType === 'INSERT') return prev.trades.some(t => t.id === trade.id) ? prev : { ...prev, trades: [trade, ...prev.trades] }; return { ...prev, trades: prev.trades.map(t => t.id === trade.id ? trade : t) };
-  }
+  if (table === 'accounts') { if (eventType === 'DELETE') { const id = (old as AccountRow | null)?.id; return id ? { ...prev, accounts: prev.accounts.filter(a => a.id !== id) } : prev; } const acc = rowToAccount(newRec as unknown as AccountRow); if (eventType === 'INSERT') return prev.accounts.some(a => a.id === acc.id) ? prev : { ...prev, accounts: [...prev.accounts, acc] }; return { ...prev, accounts: prev.accounts.map(a => a.id === acc.id ? acc : a) }; }
+  if (table === 'trades') { if (eventType === 'DELETE') { const id = (old as TradeRow | null)?.id; return id ? { ...prev, trades: prev.trades.filter(t => t.id !== id) } : prev; } const trade = rowToTrade(newRec as unknown as TradeRow); if (eventType === 'INSERT') return prev.trades.some(t => t.id === trade.id) ? prev : { ...prev, trades: [trade, ...prev.trades] }; return { ...prev, trades: prev.trades.map(t => t.id === trade.id ? trade : t) }; }
   if (eventType === 'DELETE') { const id = (old as MovementRow | null)?.id; return id ? { ...prev, movements: prev.movements.filter(m => m.id !== id) } : prev; }
   const movement = rowToMovement(newRec as unknown as MovementRow); if (eventType === 'INSERT') return prev.movements.some(m => m.id === movement.id) ? prev : { ...prev, movements: [movement, ...prev.movements] }; return { ...prev, movements: prev.movements.map(m => m.id === movement.id ? movement : m) };
 }
