@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  Award,
   BarChart3,
   Brain,
-  CalendarDays,
   Check,
   ChevronDown,
   CircleDollarSign,
@@ -16,7 +14,6 @@ import {
   Sunrise,
   Target,
   TrendingDown,
-  TrendingUp,
   Trophy,
   X,
   Zap,
@@ -46,28 +43,12 @@ const SHIFT_ORDER: Shift[] = ['Manhã', 'Tarde', 'Noite/Madrugada'];
 export function Intelligence() {
   const { trades } = useApp();
   const [period, setPeriod] = useState<Period>('Todos');
-  const [account, setAccount] = useState('Todas');
-
-  const accountOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const trade of trades) {
-      const t = trade as Trade & { accountName?: string; accountId?: string; account?: string };
-      const value = t.accountName || t.accountId || t.account;
-      if (value) values.add(String(value));
-    }
-    return ['Todas', ...Array.from(values)];
-  }, [trades]);
 
   const filteredTrades = useMemo(() => {
     const now = Date.now();
     const cutoff = period === '7 dias' ? now - 7 * 86400000 : period === '30 dias' ? now - 30 * 86400000 : 0;
-    return trades.filter((trade) => {
-      const t = trade as Trade & { accountName?: string; accountId?: string; account?: string };
-      const value = t.accountName || t.accountId || t.account;
-      const accountMatch = account === 'Todas' || String(value || '') === account;
-      return accountMatch && trade.timestamp >= cutoff;
-    });
-  }, [trades, account, period]);
+    return trades.filter((trade) => trade.timestamp >= cutoff);
+  }, [trades, period]);
 
   const stats = useMemo(() => computeStats(filteredTrades), [filteredTrades]);
 
@@ -88,8 +69,7 @@ export function Intelligence() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <FilterSelect value={account} options={accountOptions} onChange={setAccount} label="Conta" />
+            <div className="grid grid-cols-1 gap-2 sm:flex">
               <FilterSelect value={period} options={['Todos', '7 dias', '30 dias']} onChange={(v) => setPeriod(v as Period)} label="Período" />
             </div>
           </div>
@@ -118,7 +98,7 @@ export function Intelligence() {
               <PerformanceSection title="Performance por Turno" subtitle="Horários em que sua execução é mais consistente" icon={<Clock3 size={17} />}>
                 {stats.shifts.map((item) => {
                   const Icon = SHIFT_ICON[item.shift];
-                  return <ShiftRow key={item.shift} icon={Icon} shift={item.shift} total={item.total} count={item.count} max={stats.shiftMax} />;
+                  return <ShiftRow key={item.shift} icon={Icon} shift={item.shift} total={item.total} count={item.count} winRate={item.winRate} max={stats.shiftMax} />;
                 })}
               </PerformanceSection>
             </div>
@@ -193,6 +173,21 @@ function PerformanceSection({ title, subtitle, icon, children }: { title: string
   );
 }
 
+function RelativePnlBar({ value, max }: { value: number; max: number }) {
+  const magnitude = Math.min(100, Math.abs(value) / Math.max(1, max) * 100);
+  const width = value === 0 ? 0 : Math.max(4, magnitude);
+  const isProfit = value > 0;
+  const isLoss = value < 0;
+
+  return (
+    <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-[#1D1D1D]">
+      <div className="absolute inset-y-0 left-1/2 z-10 w-px -translate-x-1/2 bg-[#666]" />
+      {isLoss && <div className="absolute inset-y-0 right-1/2 rounded-l-full bg-[#B9404A]/80" style={{ width: `${width / 2}%` }} />}
+      {isProfit && <div className="absolute inset-y-0 left-1/2 rounded-r-full bg-emerald-500/80" style={{ width: `${width / 2}%` }} />}
+    </div>
+  );
+}
+
 function RankRow({ rank, label, value, detail, max }: { rank: number; label: string; value: number; detail: string; max: number }) {
   const medal = rank === 1 ? 'text-[#D4AF37]' : rank === 2 ? 'text-gray-300' : 'text-[#8C6B45]';
   return (
@@ -204,7 +199,7 @@ function RankRow({ rank, label, value, detail, max }: { rank: number; label: str
             <span className="truncate text-xs font-bold text-gray-200">{label}</span>
             <span className={`text-xs font-bold tabular-nums ${value >= 0 ? 'text-emerald-400' : 'text-[#B9404A]'}`}>{formatSignedCurrency(value)}</span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#1D1D1D]"><div className={`h-full rounded-full ${value >= 0 ? 'bg-emerald-500/70' : 'bg-[#B9404A]/70'}`} style={{ width: `${Math.min(100, Math.max(3, Math.abs(value) / Math.max(1, max) * 100))}%` }} /></div>
+          <RelativePnlBar value={value} max={max} />
           <p className="mt-1.5 text-[10px] text-gray-600">{detail}</p>
         </div>
       </div>
@@ -212,15 +207,15 @@ function RankRow({ rank, label, value, detail, max }: { rank: number; label: str
   );
 }
 
-function ShiftRow({ icon: Icon, shift, total, count, max }: { icon: typeof Sun; shift: Shift; total: number; count: number; max: number }) {
+function ShiftRow({ icon: Icon, shift, total, count, winRate, max }: { icon: typeof Sun; shift: Shift; total: number; count: number; winRate: number; max: number }) {
   return (
     <div className="rounded-xl border border-[#202020] bg-[#0C0C0C] p-3">
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#D4AF37]/10 text-[#D4AF37]"><Icon size={17} /></div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold text-gray-200">{shift}</span><span className={`text-xs font-bold ${total >= 0 ? 'text-emerald-400' : 'text-[#B9404A]'}`}>{formatSignedCurrency(total)}</span></div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#1D1D1D]"><div className={`h-full rounded-full ${total >= 0 ? 'bg-[#D4AF37]/60' : 'bg-[#B9404A]/60'}`} style={{ width: `${Math.min(100, Math.max(3, Math.abs(total) / Math.max(1, max) * 100))}%` }} /></div>
-          <p className="mt-1.5 text-[10px] text-gray-600">{count} trades registrados</p>
+          <RelativePnlBar value={total} max={max} />
+          <p className="mt-1.5 text-[10px] text-gray-600">{count} trades · {winRate}% de acerto</p>
         </div>
       </div>
     </div>
@@ -231,7 +226,7 @@ function ContextRow({ context, total, count, winRate, max }: { context: string; 
   return (
     <div className="rounded-xl border border-[#202020] bg-[#0C0C0C] p-3">
       <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold text-gray-200">{context}</span><span className={`text-xs font-bold ${total >= 0 ? 'text-emerald-400' : 'text-[#B9404A]'}`}>{formatSignedCurrency(total)}</span></div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#1D1D1D]"><div className={`h-full rounded-full ${total >= 0 ? 'bg-emerald-500/60' : 'bg-[#B9404A]/60'}`} style={{ width: `${Math.min(100, Math.max(3, Math.abs(total) / Math.max(1, max) * 100))}%` }} /></div>
+      <RelativePnlBar value={total} max={max} />
       <div className="mt-1.5 flex justify-between text-[10px] text-gray-600"><span>{count} trades</span><span>{winRate}% acerto</span></div>
     </div>
   );
@@ -269,37 +264,56 @@ function EmptyState() {
   );
 }
 
-interface AssetStat { asset: Asset; total: number; count: number; winRate: number; }
-interface ContextStat { context: Context; total: number; count: number; winRate: number; }
-interface ShiftStat { shift: Shift; total: number; count: number; }
+interface AssetStat { asset: Asset; total: number; count: number; wins: number; losses: number; winRate: number; }
+interface ContextStat { context: Context; total: number; count: number; wins: number; losses: number; winRate: number; }
+interface ShiftStat { shift: Shift; total: number; count: number; wins: number; losses: number; winRate: number; }
 
 function computeStats(trades: Trade[]) {
   const takes = trades.filter((t) => t.result === 'Take').length;
   const stops = trades.filter((t) => t.result === 'Stop').length;
   const breakEvens = trades.filter((t) => t.result === 'Break Even' || t.result === 'BE').length;
+  const decisiveTrades = takes + stops;
   const globalTotal = trades.reduce((sum, t) => sum + t.amount, 0);
   const grossProfit = trades.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
   const grossLoss = Math.abs(trades.filter((t) => t.amount < 0).reduce((sum, t) => sum + t.amount, 0));
   const profitFactor = grossLoss === 0 ? (grossProfit > 0 ? Infinity : 0) : grossProfit / grossLoss;
-  const globalWinRate = Math.round((takes / trades.length) * 100);
+  const globalWinRate = decisiveTrades === 0 ? 0 : Math.round((takes / decisiveTrades) * 100);
 
-  const byAsset = new Map<Asset, { total: number; count: number; wins: number }>();
-  const byContext = new Map<Context, { total: number; count: number; wins: number }>();
-  const byShift = new Map<Shift, { total: number; count: number }>();
+  const byAsset = new Map<Asset, { total: number; count: number; wins: number; losses: number }>();
+  const byContext = new Map<Context, { total: number; count: number; wins: number; losses: number }>();
+  const byShift = new Map<Shift, { total: number; count: number; wins: number; losses: number }>();
 
   for (const trade of trades) {
-    const asset = byAsset.get(trade.asset) || { total: 0, count: 0, wins: 0 };
-    asset.total += trade.amount; asset.count += 1; asset.wins += trade.result === 'Take' ? 1 : 0; byAsset.set(trade.asset, asset);
-    const context = byContext.get(trade.context) || { total: 0, count: 0, wins: 0 };
-    context.total += trade.amount; context.count += 1; context.wins += trade.result === 'Take' ? 1 : 0; byContext.set(trade.context, context);
+    const asset = byAsset.get(trade.asset) || { total: 0, count: 0, wins: 0, losses: 0 };
+    asset.total += trade.amount;
+    asset.count += 1;
+    asset.wins += trade.result === 'Take' ? 1 : 0;
+    asset.losses += trade.result === 'Stop' ? 1 : 0;
+    byAsset.set(trade.asset, asset);
+
+    const context = byContext.get(trade.context) || { total: 0, count: 0, wins: 0, losses: 0 };
+    context.total += trade.amount;
+    context.count += 1;
+    context.wins += trade.result === 'Take' ? 1 : 0;
+    context.losses += trade.result === 'Stop' ? 1 : 0;
+    byContext.set(trade.context, context);
+
     const shift = shiftOf(trade.timestamp);
-    const shiftData = byShift.get(shift) || { total: 0, count: 0 };
-    shiftData.total += trade.amount; shiftData.count += 1; byShift.set(shift, shiftData);
+    const shiftData = byShift.get(shift) || { total: 0, count: 0, wins: 0, losses: 0 };
+    shiftData.total += trade.amount;
+    shiftData.count += 1;
+    shiftData.wins += trade.result === 'Take' ? 1 : 0;
+    shiftData.losses += trade.result === 'Stop' ? 1 : 0;
+    byShift.set(shift, shiftData);
   }
 
-  const assets: AssetStat[] = Array.from(byAsset.entries()).map(([asset, x]) => ({ asset, ...x, winRate: Math.round(x.wins / x.count * 100) })).sort((a, b) => b.total - a.total);
-  const contexts: ContextStat[] = Array.from(byContext.entries()).map(([context, x]) => ({ context, ...x, winRate: Math.round(x.wins / x.count * 100) })).sort((a, b) => b.total - a.total);
-  const shifts: ShiftStat[] = SHIFT_ORDER.map((shift) => ({ shift, ...(byShift.get(shift) || { total: 0, count: 0 }) }));
+  const winRateOf = (wins: number, losses: number) => wins + losses === 0 ? 0 : Math.round(wins / (wins + losses) * 100);
+  const assets: AssetStat[] = Array.from(byAsset.entries()).map(([asset, x]) => ({ asset, ...x, winRate: winRateOf(x.wins, x.losses) })).sort((a, b) => b.total - a.total);
+  const contexts: ContextStat[] = Array.from(byContext.entries()).map(([context, x]) => ({ context, ...x, winRate: winRateOf(x.wins, x.losses) })).sort((a, b) => b.total - a.total);
+  const shifts: ShiftStat[] = SHIFT_ORDER.map((shift) => {
+    const x = byShift.get(shift) || { total: 0, count: 0, wins: 0, losses: 0 };
+    return { shift, ...x, winRate: winRateOf(x.wins, x.losses) };
+  });
   const bestContext = contexts[0] || null;
   const worstContext = contexts.length ? contexts[contexts.length - 1] : null;
 
