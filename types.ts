@@ -48,10 +48,10 @@ export const PNL_RULES: Record<AccountSize, PnLRule> = Object.fromEntries(ACCOUN
 export interface AccountColor { soft: string; text: string; ring: string; dot: string; label: string; }
 export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
   '5K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
-  '10K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
-  '25K': { soft: 'bg-size25-soft', text: 'text-size25-text', ring: 'ring-size25-ring', dot: 'bg-size25', label: 'Azul Safira' },
+  '10K': { soft: 'bg-size10-soft', text: 'text-size10-text', ring: 'ring-size10-ring', dot: 'bg-size10', label: 'Azul Elétrico' },
+  '25K': { soft: 'bg-size25c-soft', text: 'text-size25c-text', ring: 'ring-size25c-ring', dot: 'bg-size25c', label: 'Ciano Premium' },
   '50K': { soft: 'bg-size50-soft', text: 'text-size50-text', ring: 'ring-size50-ring', dot: 'bg-size50', label: 'Roxo Neon' },
-  '100K': { soft: 'bg-size100-soft', text: 'text-size100-text', ring: 'ring-size100-ring', dot: 'bg-size100', label: 'Laranja/Dourado' },
+  '100K': { soft: 'bg-size100-soft', text: 'text-size100-text', ring: 'ring-size100-ring', dot: 'bg-size100', label: 'Dourado' },
   '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
 export function getAccountColor(size: AccountSize): AccountColor { return SIZE_COLORS[size]; }
