@@ -1,0 +1,57 @@
+/* Register Trade modal — visual layer only. Keeps the existing flow and data logic untouched. */
+.pc-trade-modal-card {
+  width: min(100%, 448px) !important;
+  max-width: 448px !important;
+  border-radius: 24px !important;
+}
+
+/* Use the same navigation language as the other floating modals: back inside the modal. */
+.pc-trade-modal-card > button[aria-label="Fechar registro"] {
+  display: none !important;
+}
+
+.pc-trade-modal .register-trade > div:first-child > button:first-child {
+  visibility: visible !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Equal-width compact trade fields. The native selectors remain untouched functionally. */
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > span {
+  gap: 6px !important;
+  font-size: 11px !important;
+}
+
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > span svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) input,
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) select {
+  height: 50px !important;
+  padding-left: 10px !important;
+  padding-right: 30px !important;
+  font-size: 13px !important;
+  border-radius: 14px !important;
+}
+
+.pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > div svg {
+  right: 8px !important;
+}
+
+@media (max-width: 520px) {
+  .pc-trade-modal-card {
+    width: calc(100% - 16px) !important;
+    max-width: 448px !important;
+  }
+
+  .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) {
+    gap: 6px !important;
+  }
+}
