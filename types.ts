@@ -8,6 +8,7 @@ export type Context = 'Captura de Liquidez' | 'Inversão de Fluxo' | 'Estrutura 
 export type Timeframe = 'M1' | 'M2' | 'M3' | 'M5' | 'M15';
 export type TradeResult = 'Take' | 'Stop' | 'BE';
 export type MovementType = 'investimento' | 'saque';
+export type JourneyObjectiveType = 'financeiro' | 'profissional' | 'pessoal' | 'outro';
 
 export interface Account {
   id: string; name: string; code: string; size: AccountSize; status: AccountStatus;
@@ -20,6 +21,24 @@ export interface Trade {
 }
 export interface Movement { id: string; type: MovementType; amount: number; description: string; timestamp: number; }
 export interface AppData { accounts: Account[]; trades: Trade[]; movements: Movement[]; seeded: boolean; }
+
+export interface JourneyObjective {
+  id: string;
+  name: string;
+  type: JourneyObjectiveType;
+  value?: number;
+  progress: number;
+  deadline?: string;
+  icon: string;
+  description?: string;
+  completed: boolean;
+  completedAt?: number;
+}
+export interface JourneyState {
+  startedAt?: number;
+  unlockedAchievements: string[];
+  objective?: JourneyObjective | null;
+}
 
 export const ASSETS: string[] = ['MNQ', 'NQ', 'MGC', 'GC'];
 export const CONTEXTS: Context[] = ['Captura de Liquidez', 'Inversão de Fluxo', 'Estrutura Wyckoff', 'Região Macro/Micro', 'Rompimento'];
