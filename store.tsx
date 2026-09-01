@@ -14,8 +14,8 @@ interface AppContextValue {
   journeyState: JourneyState | null;
   addAccount: (input: NewAccountInput) => void;
   addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>;
-  setAccountStatus: (id: string, status: AccountStatus) => void;
-  addMovement: (input: NewMovementInput) => void;
+  setAccountStatus: (id: string, status: AccountStatus) => Promise<{ ok: boolean; error?: string }>;
+  addMovement: (input: NewMovementInput) => Promise<{ ok: boolean; error?: string }>;
   deleteMovement: (id: string) => void;
   deleteTrade: (id: string) => void;
   deleteAccount: (id: string) => void;
@@ -139,7 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const persisted = accounts.find(a => a.id === input.accountId);
       if (persisted) {
         const { error } = await supabase.from('accounts').update({ queue_order: persisted.queueOrder, status: persisted.status, funded_at: persisted.fundedAt ?? null, phase: persisted.phase ?? null, prop_firm: persisted.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
-        if (error) console.error('Erro ao atualizar conta após trade:', error);
+        if (error) return { ok: false, error: error.message };
       }
       const nextData = { ...data, trades: data.trades.some(t => t.id === trade.id) ? data.trades : [trade, ...data.trades], accounts };
       setData(prev => ({ ...prev, trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades], accounts }));
@@ -147,24 +147,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: true };
     };
 
-    const setAccountStatus: AppContextValue['setAccountStatus'] = (id, status) => {
-      setData(prev => {
-        const queue = prev.accounts.slice().sort((a, b) => a.queueOrder - b.queueOrder);
-        const maxOrder = queue.length ? Math.max(...queue.map(a => a.queueOrder)) : -1;
-        const accounts = prev.accounts.map(a => a.id === id ? { ...a, status, phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
-        const updated = accounts.find(a => a.id === id);
-        if (updated) supabase.from('accounts').update({ status: updated.status, phase: updated.phase ?? null, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id).then(({ error }) => { if (error) console.error('Erro ao atualizar conta:', error); });
-        void syncJourneyAchievementsFor({ ...data, accounts }, journeyState, user?.id);
-        return { ...prev, accounts };
-      });
+    const setAccountStatus: AppContextValue['setAccountStatus'] = async (id, status) => {
+      if (!user?.id) return { ok: false, error: 'Usuário não autenticado.' };
+      const queue = data.accounts.slice().sort((a, b) => a.queueOrder - b.queueOrder);
+      const maxOrder = queue.length ? Math.max(...queue.map(a => a.queueOrder)) : -1;
+      const accounts = data.accounts.map(a => a.id === id ? { ...a, status, phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
+      const updated = accounts.find(a => a.id === id);
+      if (!updated) return { ok: false, error: 'Conta não encontrada.' };
+      const { error } = await supabase.from('accounts').update({ status: updated.status, phase: updated.phase ?? null, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id);
+      if (error) return { ok: false, error: error.message };
+      setData(prev => ({ ...prev, accounts }));
+      await syncJourneyAchievementsFor({ ...data, accounts }, journeyState, user?.id);
+      return { ok: true };
     };
 
-    const addMovement: AppContextValue['addMovement'] = input => {
+    const addMovement: AppContextValue['addMovement'] = async input => {
+      if (!user?.id) return { ok: false, error: 'Usuário não autenticado.' };
       const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() };
+      const { error } = await supabase.from('movements').insert(movementToRow(movement));
+      if (error) return { ok: false, error: error.message };
       const nextData = { ...data, movements: [movement, ...data.movements] };
       setData(prev => ({ ...prev, movements: [movement, ...prev.movements] }));
-      supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); });
-      void syncJourneyAchievementsFor(nextData, journeyState, user?.id);
+      await syncJourneyAchievementsFor(nextData, journeyState, user?.id);
+      return { ok: true };
     };
     const deleteMovement: AppContextValue['deleteMovement'] = id => { setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) })); supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
 
@@ -178,7 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const lifecycle = deriveEvaluationState(account, remainingTrades);
         const rebuilt = { ...account, status: lifecycle.status, phase: lifecycle.phase, fundedAt: lifecycle.status === 'Financiada' ? (account.fundedAt ?? Date.now() + 1) : undefined };
         accounts = data.accounts.map(a => a.id === account.id ? rebuilt : a);
-        supabase.from('accounts').update({ status: rebuilt.status, phase: rebuilt.phase, funded_at: rebuilt.fundedAt ?? null, queue_order: rebuilt.queueOrder, prop_firm: rebuilt.propFirm ?? 'FundingPips' }).eq('id', rebuilt.id).then(({ error }) => { if (error) console.error('Erro ao recalcular conta após excluir trade:', error); });
+        supabase.from('accounts').update({ status: rebuilt.status, phase: rebuilt.phase, funded_at: rebuilt.fundedAt ?? null, queue_order: rebuilt.queueOrder, prop_firm: rebuilt.propFirm ?? 'FundingPips' }).then(({ error }) => { if (error) console.error('Erro ao recalcular conta após excluir trade:', error); });
       }
       setData(prev => ({ ...prev, trades: remainingTrades, accounts }));
       supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir trade:', error); });
