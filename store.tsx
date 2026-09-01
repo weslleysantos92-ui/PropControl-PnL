@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Account, AccountPhase, AccountSize, AccountStatus, AppData, Movement, MovementType, Trade } from './types';
+import type { Account, AccountPhase, AccountSize, AccountStatus, AppData, JourneyObjective, JourneyObjectiveType, JourneyState, Movement, MovementType, Trade } from './types';
 import { seedData } from './seed';
 import { deriveEvaluationState, rotateAccount } from './rotation';
 import { supabase } from '@/lib/supabase';
@@ -8,27 +8,97 @@ import { useAuth } from '@/lib/auth';
 interface NewAccountInput { name: string; code: string; size: AccountSize; }
 interface NewTradeInput { accountId: string; asset: Trade['asset']; context: Trade['context']; timeframe: Trade['timeframe']; result: Trade['result']; amount: number; note?: string; }
 interface NewMovementInput { type: MovementType; amount: number; description: string; }
-interface AppContextValue { data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean; addAccount: (input: NewAccountInput) => void; addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>; setAccountStatus: (id: string, status: AccountStatus) => void; addMovement: (input: NewMovementInput) => void; deleteMovement: (id: string) => void; deleteTrade: (id: string) => void; deleteAccount: (id: string) => void; }
+interface JourneyObjectiveInput { name: string; type: JourneyObjectiveType; value?: number; progress: number; deadline?: string; icon: string; description?: string; }
+interface AppContextValue {
+  data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; loading: boolean;
+  journeyState: JourneyState | null;
+  addAccount: (input: NewAccountInput) => void;
+  addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>;
+  setAccountStatus: (id: string, status: AccountStatus) => void;
+  addMovement: (input: NewMovementInput) => void;
+  deleteMovement: (id: string) => void;
+  deleteTrade: (id: string) => void;
+  deleteAccount: (id: string) => void;
+  startJourney: () => Promise<{ ok: boolean; error?: string }>;
+  saveJourneyObjective: (input: JourneyObjectiveInput) => Promise<{ ok: boolean; error?: string }>;
+  completeJourneyObjective: () => Promise<{ ok: boolean; error?: string }>;
+  syncJourneyAchievements: () => Promise<void>;
+}
 const AppContext = createContext<AppContextValue | null>(null);
 const EMPTY_DATA: AppData = { accounts: [], trades: [], movements: [], seeded: true };
+
+const TRADE_MILESTONES = [25, 50, 100, 250, 500, 1000] as const;
+const DAY_MILESTONES = [30, 90, 180, 365] as const;
+const TEN_K_MILESTONES = [1, 2, 3, 4] as const;
+const PAYOUT_MILESTONES = [10000, 25000, 50000, 100000] as const;
+const SCALE_IDS = ['scale_25k', 'scale_50k', 'scale_100k', 'scale_2x100k', 'scale_3x100k', 'scale_4x100k'] as const;
+
+function calculateJourneyAchievements(state: JourneyState | null, data: AppData): string[] {
+  if (!state?.startedAt) return state?.unlockedAchievements ?? [];
+  const startMs = state.startedAt;
+  const unlocked = new Set(state.unlockedAchievements ?? []);
+  const journeyTrades = data.trades.filter(t => t.timestamp >= startMs);
+  const journeyMovements = data.movements.filter(m => m.timestamp >= startMs);
+  const funded = data.accounts.filter(a => a.status === 'Financiada' && a.fundedAt != null && a.fundedAt >= startMs);
+  const tenKCount = funded.filter(a => a.size === '10K').length;
+  const count25 = funded.filter(a => a.size === '25K').length;
+  const count50 = funded.filter(a => a.size === '50K').length;
+  const count100 = funded.filter(a => a.size === '100K').length;
+  const payouts = journeyMovements.filter(m => String(m.type).toLowerCase() === 'saque').reduce((sum, m) => sum + Number(m.amount || 0), 0);
+  const days = Math.max(1, Math.floor((Date.now() - startMs) / 86400000) + 1);
+
+  TRADE_MILESTONES.forEach(n => { if (journeyTrades.length >= n) unlocked.add(`discipline_trades_${n}`); });
+  DAY_MILESTONES.forEach(n => { if (days >= n) unlocked.add(`discipline_days_${n}`); });
+  TEN_K_MILESTONES.forEach(n => { if (tenKCount >= n) unlocked.add(`tenk_${n}`); });
+  if (count25 >= 1) unlocked.add(SCALE_IDS[0]);
+  if (count50 >= 1) unlocked.add(SCALE_IDS[1]);
+  if (count100 >= 1) unlocked.add(SCALE_IDS[2]);
+  if (count100 >= 2) unlocked.add(SCALE_IDS[3]);
+  if (count100 >= 3) unlocked.add(SCALE_IDS[4]);
+  if (count100 >= 4) unlocked.add(SCALE_IDS[5]);
+  PAYOUT_MILESTONES.forEach(n => { if (payouts >= n) unlocked.add(`freedom_${n}`); });
+  return Array.from(unlocked);
+}
+
+async function persistJourneyState(userId: string, state: JourneyState): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.from('journey_state').upsert({
+    user_id: userId,
+    started_at: state.startedAt ?? null,
+    unlocked_achievements: state.unlockedAchievements ?? [],
+    objective: state.objective ?? null,
+    updated_at: Date.now(),
+  }, { onConflict: 'user_id' });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [data, setData] = useState<AppData>(EMPTY_DATA);
+  const [journeyState, setJourneyState] = useState<JourneyState | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setData(EMPTY_DATA); setLoading(false); return; }
+    if (!user) { setData(EMPTY_DATA); setJourneyState(null); setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [accRes, tradeRes, movRes] = await Promise.all([supabase.from('accounts').select('*'), supabase.from('trades').select('*'), supabase.from('movements').select('*')]);
+      const [accRes, tradeRes, movRes, journeyRes] = await Promise.all([
+        supabase.from('accounts').select('*'),
+        supabase.from('trades').select('*'),
+        supabase.from('movements').select('*'),
+        supabase.from('journey_state').select('*').maybeSingle(),
+      ]);
       if (cancelled) return;
       const accounts = (accRes.data || []).map(rowToAccount);
       const trades = (tradeRes.data || []).map(rowToTrade);
       const movements = (movRes.data || []).map(rowToMovement);
-      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) { const seeded = seedData(); await seedToSupabase(seeded); if (!cancelled) setData(seeded); }
-      else setData({ accounts, trades, movements, seeded: true });
+      const loadedJourney = journeyRes.data ? rowToJourneyState(journeyRes.data as JourneyStateRow) : null;
+      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) {
+        const seeded = seedData();
+        await seedToSupabase(seeded);
+        if (!cancelled) setData(seeded);
+      } else setData({ accounts, trades, movements, seeded: true });
+      if (!cancelled) setJourneyState(loadedJourney);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -40,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, payload => setData(prev => applyChange(prev, 'accounts', payload)))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, payload => setData(prev => applyChange(prev, 'trades', payload)))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'movements' }, payload => setData(prev => applyChange(prev, 'movements', payload)))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journey_state' }, payload => setJourneyState(rowToJourneyState(payload.new as unknown as JourneyStateRow)))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -70,7 +141,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.from('accounts').update({ queue_order: persisted.queueOrder, status: persisted.status, funded_at: persisted.fundedAt ?? null, phase: persisted.phase ?? null, prop_firm: persisted.propFirm ?? 'FundingPips' }).eq('id', input.accountId);
         if (error) console.error('Erro ao atualizar conta após trade:', error);
       }
+      const nextData = { ...data, trades: data.trades.some(t => t.id === trade.id) ? data.trades : [trade, ...data.trades], accounts };
       setData(prev => ({ ...prev, trades: prev.trades.some(t => t.id === trade.id) ? prev.trades : [trade, ...prev.trades], accounts }));
+      await syncJourneyAchievementsFor(nextData, journeyState, user?.id);
       return { ok: true };
     };
 
@@ -81,11 +154,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const accounts = prev.accounts.map(a => a.id === id ? { ...a, status, phase: status === 'Avaliacao' ? (a.phase === 0 ? 1 : a.phase) : 0 as AccountPhase, queueOrder: maxOrder + 1, fundedAt: status === 'Financiada' ? (a.fundedAt ?? Date.now() + 1) : undefined } : a);
         const updated = accounts.find(a => a.id === id);
         if (updated) supabase.from('accounts').update({ status: updated.status, phase: updated.phase ?? null, queue_order: updated.queueOrder, funded_at: updated.fundedAt ?? null }).eq('id', id).then(({ error }) => { if (error) console.error('Erro ao atualizar conta:', error); });
+        void syncJourneyAchievementsFor({ ...data, accounts }, journeyState, user?.id);
         return { ...prev, accounts };
       });
     };
 
-    const addMovement: AppContextValue['addMovement'] = input => { const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() }; setData(prev => ({ ...prev, movements: [movement, ...prev.movements] })); supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); }); };
+    const addMovement: AppContextValue['addMovement'] = input => {
+      const movement: Movement = { id: crypto.randomUUID(), type: input.type, amount: input.amount, description: input.description, timestamp: Date.now() };
+      const nextData = { ...data, movements: [movement, ...data.movements] };
+      setData(prev => ({ ...prev, movements: [movement, ...prev.movements] }));
+      supabase.from('movements').insert(movementToRow(movement)).then(({ error }) => { if (error) console.error(error); });
+      void syncJourneyAchievementsFor(nextData, journeyState, user?.id);
+    };
     const deleteMovement: AppContextValue['deleteMovement'] = id => { setData(prev => ({ ...prev, movements: prev.movements.filter(m => m.id !== id) })); supabase.from('movements').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
 
     const deleteTrade: AppContextValue['deleteTrade'] = id => {
@@ -105,10 +185,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const deleteAccount: AppContextValue['deleteAccount'] = id => { setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) })); supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
-    return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount };
-  }, [data, loading, user]);
+
+    const startJourney: AppContextValue['startJourney'] = async () => {
+      if (journeyState?.startedAt) return { ok: true };
+      if (!user?.id) return { ok: false, error: 'Usuário não autenticado.' };
+      const state: JourneyState = { startedAt: Date.now(), unlockedAchievements: [], objective: journeyState?.objective ?? null };
+      const result = await persistJourneyState(user.id, state);
+      if (result.ok) setJourneyState(state);
+      return result;
+    };
+
+    const saveJourneyObjective: AppContextValue['saveJourneyObjective'] = async input => {
+      if (!user?.id) return { ok: false, error: 'Usuário não autenticado.' };
+      if (!journeyState?.startedAt) return { ok: false, error: 'Inicie a Jornada antes de criar um objetivo.' };
+      const current = journeyState.objective;
+      const objective: JourneyObjective = {
+        id: current?.id ?? crypto.randomUUID(), name: input.name.trim(), type: input.type, value: input.value, progress: Math.max(0, Number(input.progress) || 0), deadline: input.deadline || undefined,
+        icon: input.icon, description: input.description?.trim() || undefined, completed: current?.completed ?? false, completedAt: current?.completedAt,
+      };
+      const nextState = { ...journeyState, objective };
+      const result = await persistJourneyState(user.id, nextState);
+      if (result.ok) setJourneyState(nextState);
+      return result;
+    };
+
+    const completeJourneyObjective: AppContextValue['completeJourneyObjective'] = async () => {
+      if (!user?.id || !journeyState?.objective) return { ok: false, error: 'Objetivo não encontrado.' };
+      const objective = { ...journeyState.objective, completed: true, completedAt: Date.now(), progress: journeyState.objective.value ?? journeyState.objective.progress };
+      const nextState = { ...journeyState, objective };
+      const result = await persistJourneyState(user.id, nextState);
+      if (result.ok) setJourneyState(nextState);
+      return result;
+    };
+
+    const syncJourneyAchievements: AppContextValue['syncJourneyAchievements'] = async () => {
+      await syncJourneyAchievementsFor(data, journeyState, user?.id, setJourneyState);
+    };
+
+    return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, journeyState, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount, startJourney, saveJourneyObjective, completeJourneyObjective, syncJourneyAchievements };
+  }, [data, loading, journeyState, user]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
+
+async function syncJourneyAchievementsFor(nextData: AppData, state: JourneyState | null, userId?: string, setState?: (state: JourneyState) => void) {
+  if (!state?.startedAt || !userId) return;
+  const nextUnlocked = calculateJourneyAchievements(state, nextData);
+  if (nextUnlocked.length === state.unlockedAchievements.length && nextUnlocked.every(id => state.unlockedAchievements.includes(id))) return;
+  const nextState = { ...state, unlockedAchievements: nextUnlocked };
+  const result = await persistJourneyState(userId, nextState);
+  if (result.ok) setState?.(nextState);
+}
+
 export function useApp(): AppContextValue { const ctx = useContext(AppContext); if (!ctx) throw new Error('useApp must be used within AppProvider'); return ctx; }
 
 interface AccountRow { id: string; name: string; code: string; size: string; status: string; prop_firm?: string; phase?: number; queue_order: number; created_at: number; funded_at: number | null; }
@@ -120,6 +247,8 @@ function tradeToRow(t: Trade): TradeRow { return { id: t.id, account_id: t.accou
 interface MovementRow { id: string; type: string; amount: number; description: string; timestamp: number; }
 function rowToMovement(r: MovementRow): Movement { return { id: r.id, type: r.type as MovementType, amount: Number(r.amount), description: r.description, timestamp: r.timestamp }; }
 function movementToRow(m: Movement): MovementRow { return { id: m.id, type: m.type, amount: m.amount, description: m.description, timestamp: m.timestamp }; }
+interface JourneyStateRow { id: string; user_id: string; started_at: number | null; unlocked_achievements: unknown; objective: JourneyObjective | null; updated_at: number; }
+function rowToJourneyState(r: JourneyStateRow): JourneyState { return { startedAt: r.started_at ?? undefined, unlockedAchievements: Array.isArray(r.unlocked_achievements) ? r.unlocked_achievements.filter(v => typeof v === 'string') as string[] : [], objective: r.objective ?? null }; }
 
 type Payload = { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; old: Record<string, unknown> | null; new: Record<string, unknown> | null };
 function applyChange(prev: AppData, table: 'accounts' | 'trades' | 'movements', payload: Payload): AppData {
