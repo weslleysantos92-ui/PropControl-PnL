@@ -102,3 +102,120 @@ input, textarea, select, button { font-family: inherit; }
   .pc-dashboard > div:first-child .flex.items-center.gap-4 > .flex-1.min-w-0 h2 { font-size: 19px !important; }
   .pc-dashboard > div:first-child .flex.items-center.gap-3 > .flex.flex-col.gap-1.w-\[100px\] { width: 78px !important; }
 }
+
+/* Jornada — experiência cinematográfica desktop.
+   Isolado pela presença do elemento "Família" para não afetar capítulos internos.
+   Mobile permanece intocado. */
+@media (min-width: 900px) {
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background:
+      linear-gradient(90deg, rgba(3,4,5,.98) 0%, rgba(3,4,5,.92) 34%, rgba(3,4,5,.60) 55%, rgba(3,4,5,.10) 78%, rgba(3,4,5,.04) 100%),
+      url('https://raw.githubusercontent.com/weslleysantos92-ui/PropControl-PnL/main/referencias/Jornada%20Dourada_%20Caminho%20para%20a%20Liberdade.png') right center / cover no-repeat;
+    background-attachment: fixed;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 78% 42%, rgba(255,196,54,.13), transparent 25%),
+      linear-gradient(180deg, rgba(2,3,4,.10) 0%, rgba(2,3,4,.02) 42%, rgba(2,3,4,.52) 100%);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div {
+    position: relative;
+    z-index: 1;
+    max-width: none !important;
+    min-height: calc(100vh - 68px);
+    padding: 20px 28px 50px !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(3,4,5,.35) 0%, rgba(3,4,5,.18) 48%, transparent 78%);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:first-child {
+    min-height: 255px !important;
+    border: 1px solid rgba(212,175,55,.34) !important;
+    border-radius: 22px !important;
+    background: linear-gradient(90deg, rgba(5,6,7,.86), rgba(5,6,7,.48), rgba(5,6,7,.16)) !important;
+    box-shadow: 0 18px 55px rgba(0,0,0,.42), inset 0 0 50px rgba(212,175,55,.035) !important;
+    backdrop-filter: blur(2px);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:first-child > div.absolute {
+    display: none !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey [aria-label="Família"] {
+    display: none !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:first-child > div.relative {
+    margin-top: 92px !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(2) {
+    border-color: rgba(212,175,55,.20) !important;
+    background: rgba(8,9,11,.72) !important;
+    box-shadow: 0 14px 38px rgba(0,0,0,.32) !important;
+    backdrop-filter: blur(10px);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) {
+    position: relative;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button {
+    border-color: rgba(212,175,55,.22) !important;
+    background: linear-gradient(135deg, rgba(8,9,11,.86), rgba(8,9,11,.58)) !important;
+    box-shadow: 0 14px 35px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.025);
+    backdrop-filter: blur(9px);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button:hover {
+    border-color: rgba(212,175,55,.52) !important;
+    box-shadow: 0 18px 42px rgba(0,0,0,.40), 0 0 26px rgba(212,175,55,.08);
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button[class*="border-emerald"] {
+    border-color: rgba(212,175,55,.48) !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button[class*="border-blue"] {
+    border-color: rgba(73,132,214,.34) !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button[class*="border-purple"] {
+    border-color: rgba(166,112,214,.34) !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > section:nth-child(3) button[class*="border-amber"] {
+    border-color: rgba(212,175,55,.46) !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > button {
+    border-color: rgba(255,216,90,.62) !important;
+    box-shadow: 0 14px 40px rgba(212,175,55,.14), inset 0 1px 0 rgba(255,255,255,.20) !important;
+  }
+
+  body:has(.pc-journey [aria-label="Família"]) .pc-journey > div > div {
+    scrollbar-color: rgba(212,175,55,.45) transparent;
+  }
+}
