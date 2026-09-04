@@ -14,7 +14,7 @@ interface JourneyObjectiveInput { name: string; type: JourneyObjectiveType; valu
 interface AppContextValue {
   data: AppData; accounts: Account[]; trades: Trade[]; movements: Movement[]; propFirms: PropFirm[]; loading: boolean;
   journeyState: JourneyState | null;
-  addAccount: (input: NewAccountInput) => void;
+  addAccount: (input: NewAccountInput) => Promise<{ ok: boolean; error?: string }>;
   addTrade: (input: NewTradeInput) => Promise<{ ok: boolean; error?: string }>;
   setAccountStatus: (id: string, status: AccountStatus) => Promise<{ ok: boolean; error?: string }>;
   addMovement: (input: NewMovementInput) => Promise<{ ok: boolean; error?: string }>;
@@ -114,12 +114,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const value = useMemo<AppContextValue>(() => {
-    const addAccount: AppContextValue['addAccount'] = input => {
+    const addAccount: AppContextValue['addAccount'] = async input => {
+      if (!user?.id) return { ok: false, error: 'Usuário não autenticado.' };
       const status: AccountStatus = 'Avaliacao';
       const maxOrder = data.accounts.length ? Math.max(...data.accounts.map(a => a.queueOrder)) : -1;
       const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: input.propFirmName ?? 'FundingPips', propFirmName: input.propFirmName ?? 'FundingPips', propProgramName: input.propProgramName, propProgramId: input.propProgramId, phase: 1, currentPhase: 1, rulesSnapshot: input.rulesSnapshot, createdAt: Date.now(), queueOrder: maxOrder + 1 };
+      const { error } = await supabase.from('accounts').insert(accountToRow(acc));
+      if (error) {
+        console.error('Erro ao salvar conta:', error);
+        return { ok: false, error: error.message };
+      }
       setData(prev => ({ ...prev, accounts: [...prev.accounts, acc] }));
-      supabase.from('accounts').insert(accountToRow(acc)).then(({ error }) => { if (error) console.error('Erro ao salvar conta:', error); });
+      return { ok: true };
     };
 
     const addTrade: AppContextValue['addTrade'] = async input => {
@@ -187,7 +193,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.from('trades').delete().eq('id', id).then(({ error }) => { if (error) console.error('Erro ao excluir trade:', error); });
     };
 
-    const deleteAccount: AppContextValue['deleteAccount'] = id => { setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) })); supabase.from('accounts').delete().eq('id', id).then(({ error }) => { if (error) console.error(error); }); };
+    const deleteAccount: AppContextValue['deleteAccount'] = async id => {
+      const account = data.accounts.find(a => a.id === id);
+      if (!account) return;
+      const { error: tradeError } = await supabase.from('trades').delete().eq('account_id', id);
+      if (tradeError) {
+        console.error('Erro ao excluir trades da conta:', tradeError);
+        return;
+      }
+      const { error } = await supabase.from('accounts').delete().eq('id', id);
+      if (error) {
+        console.error('Erro ao excluir conta:', error);
+        return;
+      }
+      setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id), trades: prev.trades.filter(t => t.accountId !== id) }));
+    };
 
     const createPropFirm: AppContextValue['createPropFirm'] = async input => {
       const firmId = crypto.randomUUID();
@@ -287,11 +307,27 @@ async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]
 
     const programs = [...firm.programs];
     for (const p of config.programs) {
-      if (programs.some(item => item.name.trim().toLowerCase() === p.name.trim().toLowerCase())) continue;
-      const id = crypto.randomUUID();
-      const { error } = await supabase.from('prop_programs').insert({ id, firm_id: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
-      if (error) { console.error('Erro ao cadastrar programa oficial:', error); continue; }
-      programs.push({ id, firmId: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+      const existingProgram = programs.find(item => item.name.trim().toLowerCase() === p.name.trim().toLowerCase());
+      if (!existingProgram) {
+        const id = crypto.randomUUID();
+        const { error } = await supabase.from('prop_programs').insert({ id, firm_id: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+        if (error) { console.error('Erro ao cadastrar programa oficial:', error); continue; }
+        programs.push({ id, firmId: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+        continue;
+      }
+      const expectedSizes = JSON.stringify(p.sizes);
+      const currentSizes = JSON.stringify(existingProgram.sizes);
+      const currentPhases = JSON.stringify(existingProgram.phases);
+      const expectedPhases = JSON.stringify(p.phases);
+      if (currentSizes !== expectedSizes || currentPhases !== expectedPhases) {
+        const { error } = await supabase.from('prop_programs').update({ sizes: p.sizes, phases: p.phases }).eq('id', existingProgram.id);
+        if (error) {
+          console.error('Erro ao atualizar programa oficial:', error);
+        } else {
+          const index = programs.findIndex(item => item.id === existingProgram.id);
+          if (index >= 0) programs[index] = { ...existingProgram, sizes: p.sizes, phases: p.phases };
+        }
+      }
     }
     const updatedFirm = { ...firm, isOfficial: true, programs };
     const index = result.findIndex(item => item.id === firm!.id);
