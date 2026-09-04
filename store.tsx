@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Account, AccountPhase, AccountRuleSnapshot, AccountSize, AccountStatus, AppData, JourneyObjective, JourneyObjectiveType, JourneyState, Movement, MovementType, Trade } from './types';
-import { seedData } from './seed';
 import { deriveEvaluationState, rotateAccount } from './rotation';
 import { OFFICIAL_PROP_FIRMS, hydrateRules, type PhaseRules, type PropFirmConfig } from './propConfig';
 import { supabase } from '@/lib/supabase';
@@ -91,14 +90,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const accounts = (accRes.data || []).map(rowToAccount);
       const trades = (tradeRes.data || []).map(rowToTrade);
       const movements = (movRes.data || []).map(rowToMovement);
-      let firms = mapPropFirms(firmRes.data || [], programRes.data || []);
-      if (firms.length === 0) firms = await seedOfficialPropFirms();
       const loadedJourney = journeyRes.data ? rowToJourneyState(journeyRes.data as JourneyStateRow) : null;
-      if (accounts.length === 0 && trades.length === 0 && movements.length === 0) {
-        const seeded = seedData();
-        await seedToSupabase(seeded);
-        if (!cancelled) setData(seeded);
-      } else setData({ accounts, trades, movements, seeded: true });
+      // Empty is a valid state for an authenticated user. Never recreate demo/legacy accounts.
+      // Ensure official firms/programs individually so Lucid cannot hide FundingPips.
+      let firms = mapPropFirms(firmRes.data || [], programRes.data || []);
+      firms = await ensureOfficialPropFirms(firms);
+      if (!cancelled) setData({ accounts, trades, movements, seeded: true });
       if (!cancelled) { setPropFirms(firms); setJourneyState(loadedJourney); }
       setLoading(false);
     })();
@@ -274,12 +271,34 @@ function applyChange(prev: AppData, table: 'accounts' | 'trades' | 'movements', 
 }
 
 function mapPropFirms(firmRows: any[], programRows: any[]): PropFirm[] { return firmRows.map(f => ({ id: f.id, name: f.name, isOfficial: Boolean(f.is_official), programs: programRows.filter(p => p.firm_id === f.id).map(p => ({ id: p.id, firmId: p.firm_id, name: p.name, sizes: p.sizes as AccountSize[], phases: p.phases || [] })) })); }
-async function seedOfficialPropFirms(): Promise<PropFirm[]> { const result: PropFirm[] = []; for (const firm of OFFICIAL_PROP_FIRMS) { const firmId = crypto.randomUUID(); const { error } = await supabase.from('prop_firms').insert({ id: firmId, name: firm.name, is_official: true }); if (error) { console.error('Erro ao cadastrar mesa oficial:', error); continue; } const programs: PropProgram[] = []; for (const p of firm.programs) { const id = crypto.randomUUID(); const { error: programError } = await supabase.from('prop_programs').insert({ id, firm_id: firmId, name: p.name, sizes: p.sizes, phases: p.phases }); if (programError) { console.error('Erro ao cadastrar programa:', programError); continue; } programs.push({ id, firmId, name: p.name, sizes: p.sizes, phases: p.phases }); } result.push({ id: firmId, name: firm.name, isOfficial: true, programs }); } return result; }
+async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]> {
+  const result = [...existing];
 
-async function seedToSupabase(seed: AppData) {
-  try {
-    await supabase.from('accounts').upsert(seed.accounts.map(accountToRow), { onConflict: 'id' });
-    await supabase.from('trades').upsert(seed.trades.map(tradeToRow), { onConflict: 'id' });
-    await supabase.from('movements').upsert(seed.movements.map(movementToRow), { onConflict: 'id' });
-  } catch (e) { console.error('Erro ao semear dados:', e); }
+  for (const config of OFFICIAL_PROP_FIRMS) {
+    let firm = result.find(f => f.name.trim().toLowerCase() === config.name.trim().toLowerCase());
+
+    if (!firm) {
+      const firmId = crypto.randomUUID();
+      const { error } = await supabase.from('prop_firms').insert({ id: firmId, name: config.name, is_official: true });
+      if (error) { console.error('Erro ao cadastrar mesa oficial:', error); continue; }
+      firm = { id: firmId, name: config.name, isOfficial: true, programs: [] };
+      result.push(firm);
+    }
+
+    const programs = [...firm.programs];
+    for (const p of config.programs) {
+      if (programs.some(item => item.name.trim().toLowerCase() === p.name.trim().toLowerCase())) continue;
+      const id = crypto.randomUUID();
+      const { error } = await supabase.from('prop_programs').insert({ id, firm_id: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+      if (error) { console.error('Erro ao cadastrar programa oficial:', error); continue; }
+      programs.push({ id, firmId: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+    }
+    const updatedFirm = { ...firm, isOfficial: true, programs };
+    const index = result.findIndex(item => item.id === firm!.id);
+    if (index >= 0) result[index] = updatedFirm;
+  }
+
+  // FundingPips is the primary operating firm: keep it first in every selector.
+  return result.sort((a, b) => a.name === 'FundingPips' ? -1 : b.name === 'FundingPips' ? 1 : a.name.localeCompare(b.name));
 }
+
