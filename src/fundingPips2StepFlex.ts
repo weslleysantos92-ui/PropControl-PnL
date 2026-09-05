@@ -1,8 +1,7 @@
 export const FUNDING_PIPS_RULES = {
   firm: 'FundingPips',
-  accountSizes: [5000, 10000, 25000, 50000, 100000],
+  accountSizes: [10000, 25000, 50000, 100000],
   drawdownType: 'static',
-  maxDailyLossPct: 4,
   maxOverallLossPct: 12,
   phases: {
     phase1: { profitTargetPct: 10 },
@@ -31,10 +30,6 @@ export function getFundingPipsPhaseTarget(accountSize: number, phase: 1 | 2): nu
 
 export function getFundingPipsMaxLossLimit(accountSize: number): number {
   return accountSize * (FUNDING_PIPS_RULES.maxOverallLossPct / 100);
-}
-
-export function getFundingPipsDailyLossLimit(accountSize: number): number {
-  return accountSize * (FUNDING_PIPS_RULES.maxDailyLossPct / 100);
 }
 
 export function getFundingPipsProfitConcentrationLimit(accountSize: number): number | null {
