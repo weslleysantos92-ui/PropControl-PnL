@@ -119,7 +119,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const status: AccountStatus = 'Avaliacao';
       const maxOrder = data.accounts.length ? Math.max(...data.accounts.map(a => a.queueOrder)) : -1;
       const acc: Account = { id: crypto.randomUUID(), name: input.name, code: input.code, size: input.size, status, propFirm: input.propFirmName ?? 'FundingPips', propFirmName: input.propFirmName ?? 'FundingPips', propProgramName: input.propProgramName, propProgramId: input.propProgramId, phase: 1, currentPhase: 1, rulesSnapshot: input.rulesSnapshot, createdAt: Date.now(), queueOrder: maxOrder + 1 };
-      const { error } = await supabase.from('accounts').insert(accountToRow(acc));
+      let { error } = await supabase.from('accounts').insert(accountToRow(acc));
+      if (error && input.propProgramId && /prop_program_id|foreign key|schema cache/i.test(error.message)) {
+        ({ error } = await supabase.from('accounts').insert(accountToRow({ ...acc, propProgramId: undefined })));
+      }
       if (error) {
         console.error('Erro ao salvar conta:', error);
         return { ok: false, error: error.message };
@@ -300,7 +303,11 @@ async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]
     if (!firm) {
       const firmId = crypto.randomUUID();
       const { error } = await supabase.from('prop_firms').insert({ id: firmId, name: config.name, is_official: true });
-      if (error) { console.error('Erro ao cadastrar mesa oficial:', error); continue; }
+      if (error) {
+        console.error('Erro ao cadastrar mesa oficial:', error);
+        firm = { id: crypto.randomUUID(), name: config.name, isOfficial: true, programs: [] };
+        result.push(firm);
+      }
       firm = { id: firmId, name: config.name, isOfficial: true, programs: [] };
       result.push(firm);
     }
@@ -311,7 +318,11 @@ async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]
       if (!existingProgram) {
         const id = crypto.randomUUID();
         const { error } = await supabase.from('prop_programs').insert({ id, firm_id: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
-        if (error) { console.error('Erro ao cadastrar programa oficial:', error); continue; }
+        if (error) {
+          console.error('Erro ao cadastrar programa oficial:', error);
+          programs.push({ id: crypto.randomUUID(), firmId: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
+          continue;
+        }
         programs.push({ id, firmId: firm.id, name: p.name, sizes: p.sizes, phases: p.phases });
         continue;
       }
@@ -334,7 +345,13 @@ async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]
     if (index >= 0) result[index] = updatedFirm;
   }
 
-  // FundingPips is the primary operating firm: keep it first in every selector.
+  for (const config of OFFICIAL_PROP_FIRMS) {
+    if (!result.some(f => f.name.trim().toLowerCase() === config.name.trim().toLowerCase())) {
+      const firmId = crypto.randomUUID();
+      result.push({ id: firmId, name: config.name, isOfficial: true, programs: config.programs.map(p => ({ id: crypto.randomUUID(), firmId, name: p.name, sizes: p.sizes, phases: p.phases })) });
+    }
+  }
+  // FundingPips stays first only as a display preference; it is never preselected by NewAccountModal.
   return result.sort((a, b) => a.name === 'FundingPips' ? -1 : b.name === 'FundingPips' ? 1 : a.name.localeCompare(b.name));
 }
 
