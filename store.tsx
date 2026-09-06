@@ -305,8 +305,21 @@ async function ensureOfficialPropFirms(existing: PropFirm[]): Promise<PropFirm[]
       const { error } = await supabase.from('prop_firms').insert({ id: firmId, name: config.name, is_official: true });
       if (error) {
         console.error('Erro ao cadastrar mesa oficial:', error);
-        firm = { id: crypto.randomUUID(), name: config.name, isOfficial: true, programs: [] };
+        // Use the complete local configuration immediately. Do not overwrite it with an empty firm.
+        firm = {
+          id: crypto.randomUUID(),
+          name: config.name,
+          isOfficial: true,
+          programs: config.programs.map(p => ({
+            id: crypto.randomUUID(),
+            firmId,
+            name: p.name,
+            sizes: p.sizes,
+            phases: p.phases
+          }))
+        };
         result.push(firm);
+        continue;
       }
       firm = { id: firmId, name: config.name, isOfficial: true, programs: [] };
       result.push(firm);
