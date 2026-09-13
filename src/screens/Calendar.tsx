@@ -3,6 +3,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Trophy } from 'lucide-react';
 import { useApp } from '@/store';
 import { operationalDay, dateKey, parseDateKey, formatTime, formatSignedCurrency, WEEKDAYS, MONTHS } from '@/dates';
 import type { Trade } from '@/types';
+import { tradeR } from '@/types';
 import { BottomSheet } from '@/components/Modal';
 
 export function Calendar() {
@@ -63,7 +64,7 @@ export function Calendar() {
           </div>
           <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="w-full appearance-none rounded-xl border border-white/[0.08] bg-[#111214] px-4 py-3 text-sm text-gray-200 outline-none focus:border-[#D4AF37]/50 md:w-56">
             <option value="all">Todas as contas</option>
-            {accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+            {accounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.status === 'Reprovada' ? ' (Reprovada)' : ''}</option>)}
           </select>
         </div>
 
@@ -110,7 +111,7 @@ export function Calendar() {
           {selectedEntry ? <>
             <div className="mb-4 flex items-center gap-3"><div className={`rounded-xl px-3 py-1.5 text-sm font-bold ${selectedEntry.total >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{formatSignedCurrency(selectedEntry.total)}</div><span className="text-sm text-gray-400">{selectedEntry.count} trade{selectedEntry.count > 1 ? 's' : ''}</span></div>
             <div className="space-y-2">{selectedEntry.trades.sort((a, b) => a.timestamp - b.timestamp).map(t => <div key={t.id} className="rounded-xl border border-white/[0.06] bg-[#0D0E0F] p-3">
-              <div className="mb-1 flex items-center justify-between"><div className="flex items-center gap-2"><span className={`rounded-md px-2 py-0.5 text-xs font-bold ${t.result === 'Take' ? 'bg-emerald-500/10 text-emerald-400' : t.result === 'Stop' ? 'bg-red-500/10 text-red-400' : 'bg-white/[0.05] text-gray-300'}`}>{t.result}</span><span className="text-xs font-semibold text-gray-300">{t.asset}</span><span className="text-xs text-gray-600">{formatTime(t.timestamp)}</span></div><span className={`text-sm font-bold ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(t.amount)}</span></div>
+              <div className="mb-1 flex items-center justify-between"><div className="flex items-center gap-2"><span className={`rounded-md px-2 py-0.5 text-xs font-bold ${t.result === 'Take' ? 'bg-emerald-500/10 text-emerald-400' : t.result === 'Stop' ? 'bg-red-500/10 text-red-400' : 'bg-white/[0.05] text-gray-300'}`}>{t.result}</span><span className="text-xs font-semibold text-gray-300">{t.asset}</span><span className="text-xs text-gray-600">{formatTime(t.timestamp)}</span></div><div className="flex items-center gap-1.5"><span className={`text-sm font-bold ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(t.amount)}</span><span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${tradeR(t) >= 0 ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-400' : 'border-red-500/25 bg-red-500/[0.08] text-red-400'}`}>{tradeR(t) >= 0 ? '+' : ''}{tradeR(t).toFixed(1)}R</span></div></div>
               <p className="text-xs text-gray-400">{accountName(t.accountId)} · {t.context} · {t.timeframe}</p>{t.note && <p className="mt-1 text-xs italic text-gray-500">"{t.note}"</p>}
             </div>)}</div>
             {selectedEntry.total > 0 && <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#D4AF37]/15 bg-[#D4AF37]/[0.04] p-3 text-xs text-[#D4AF37]"><Trophy size={15} /> Dia encerrado no lucro.</div>}

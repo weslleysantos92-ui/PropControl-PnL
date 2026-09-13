@@ -1,7 +1,11 @@
 import type { Account, AccountPhase, AccountSize, AccountStatus, Trade } from './types';
-import { SIZE_VALUES } from './types';
+import { DEFAULT_FIRM_ID, SIZE_VALUES } from './types';
 import { getFundingPipsPhaseTarget, getFundingPipsProfitableDayMinimum } from './fundingPips2StepFlex';
+import { hydrateRules, type PhaseRules } from './propConfig';
 import { operationalDay } from './dates';
+
+interface MinimalProgram { sizes: AccountSize[]; phases: { phase: number; rules: PhaseRules }[] }
+interface MinimalFirm { id: string; programs: MinimalProgram[] }
 
 /** The rotation is global: evaluation and Master accounts share one queue. */
 export function getQueue(accounts: Account[], status?: AccountStatus): Account[] {
@@ -9,13 +13,13 @@ export function getQueue(accounts: Account[], status?: AccountStatus): Account[]
 }
 
 export function nextAccountToOperate(accounts: Account[]): Account | null {
-  return getQueue(accounts)[0] ?? null;
+  return getQueue(accounts).filter(a => a.status !== 'Reprovada')[0] ?? null;
 }
 
 export function rotateAccount(accounts: Account[], accountId: string): Account[] {
   const acc = accounts.find(a => a.id === accountId);
   if (!acc) return accounts;
-  const queue = getQueue(accounts);
+  const queue = getQueue(accounts).filter(a => a.status !== 'Reprovada');
   if (queue.length <= 1) return accounts;
   const maxOrder = Math.max(...queue.map(a => a.queueOrder));
   return accounts.map(a => a.id === accountId ? { ...a, queueOrder: maxOrder + 1 } : a);
@@ -40,7 +44,7 @@ export function getAccountStats(account: Account, trades: Trade[]): AccountStats
   const profitableDays = Array.from(dayTotals.values()).filter(v => v >= profitableDayMinimum).length;
   const totalAmount = accountTrades.reduce((s, t) => s + t.amount, 0);
   const targetValue = phase === 2 ? getFundingPipsPhaseTarget(capital, 2) : phase === 1 ? getFundingPipsPhaseTarget(capital, 1) : 0;
-  const progressPct = targetValue > 0 ? Math.min(100, Math.max(0, Math.round((totalAmount / targetValue) * 100))) : 0;
+  const progressPct = targetValue > 0 ? Math.min(100, Math.round((totalAmount / targetValue) * 100)) : 0;
   return { profitableDays, profitableDaysTarget: 3, progressPct, totalAmount };
 }
 
@@ -55,13 +59,50 @@ function phaseProfitableDays(accountSize: AccountSize, trades: Trade[], phase: 1
   return Array.from(totals.values()).filter(v => v >= minimum).length;
 }
 
+function genericPhaseProfitableDays(rules: PhaseRules, size: AccountSize, trades: Trade[], phase: number): number {
+  if (!rules.profitableDaysEnabled || !rules.profitableDays) return Infinity; // sem exigência de dias = já considerado cumprido
+  const capital = SIZE_VALUES[size];
+  const minimum = rules.profitableDayPct ? (capital * rules.profitableDayPct) / 100 : 0;
+  const totals = new Map<string, number>();
+  for (const t of trades) {
+    if ((t.phase ?? 1) !== phase) continue;
+    const key = operationalDay(t.timestamp);
+    totals.set(key, (totals.get(key) || 0) + t.amount);
+  }
+  return Array.from(totals.values()).filter(v => v >= minimum).length;
+}
+
+/** Mesma ideia do motor da FundingPips, só que genérica para qualquer mesa cadastrada (PNL Global, Lucid Trading, mesas personalizadas). */
+function deriveEvaluationStateForProgram(account: Account, trades: Trade[], program: MinimalProgram): { status: AccountStatus; phase: AccountPhase } {
+  const accountTrades = trades.filter(t => t.accountId === account.id);
+  const orderedPhases = [...program.phases].sort((a, b) => a.phase - b.phase);
+  for (const p of orderedPhases) {
+    const hydrated = hydrateRules(p.rules, account.size);
+    const target = hydrated.target ?? 0;
+    const profit = accountTrades.filter(t => (t.phase ?? 1) === p.phase).reduce((s, t) => s + t.amount, 0);
+    const days = genericPhaseProfitableDays(p.rules, account.size, accountTrades, p.phase);
+    const requiredDays = p.rules.profitableDaysEnabled ? (p.rules.profitableDays ?? 0) : 0;
+    const complete = profit >= target && days >= requiredDays;
+    if (!complete) return { status: 'Avaliacao', phase: (p.phase as AccountPhase) ?? 1 };
+  }
+  return { status: 'Financiada', phase: 0 };
+}
+
 /**
  * Rebuild evaluation status from phase-tagged trades.
  * Each phase has its own target and 3 profitable-day requirement.
  * Master trades (phase 0) never affect evaluation progress.
  */
-export function deriveEvaluationState(account: Account, trades: Trade[]): { status: AccountStatus; phase: AccountPhase } {
+export function deriveEvaluationState(account: Account, trades: Trade[], firms: MinimalFirm[] = []): { status: AccountStatus; phase: AccountPhase } {
   if (account.status === 'Reprovada') return { status: 'Reprovada', phase: account.phase ?? 1 };
+
+  const firmId = account.firmId ?? DEFAULT_FIRM_ID;
+  if (firmId !== DEFAULT_FIRM_ID) {
+    const firm = firms.find(f => f.id === firmId);
+    const program = firm?.programs.find(p => p.sizes.includes(account.size));
+    if (program) return deriveEvaluationStateForProgram(account, trades, program);
+  }
+
   const capital = SIZE_VALUES[account.size];
   const accountTrades = trades.filter(t => t.accountId === account.id);
 

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Plus, TrendingDown, TrendingUp, Wallet, ArrowDownCircle, ArrowUpCircle, Trash2, Landmark, Receipt, Sparkles } from 'lucide-react';
 import { useApp } from '@/store';
-import type { MovementType } from '@/types';
+import type { Account, MovementType } from '@/types';
 import { formatCurrency, formatSignedCurrency, formatDateTime } from '@/dates';
 import { Modal } from '@/components/Modal';
 
 export function Finances() {
-  const { movements, addMovement, deleteMovement } = useApp();
+  const { movements, accounts, addMovement, deleteMovement } = useApp();
   const [modalType, setModalType] = useState<MovementType | null>(null);
+  const fundedAccounts = accounts.filter((a) => a.status === 'Financiada');
 
   const totalInvestido = movements.filter((m) => m.type === 'investimento').reduce((s, m) => s + m.amount, 0);
   const totalRecebido = movements.filter((m) => m.type === 'saque').reduce((s, m) => s + m.amount, 0);
@@ -93,7 +94,7 @@ export function Finances() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{m.description}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">{formatDateTime(m.timestamp)}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{formatDateTime(m.timestamp)}{m.type === 'saque' && m.accountId && (() => { const acc = accounts.find((a) => a.id === m.accountId); return acc ? ` · ${acc.name}${m.splitPct ? ` · ${m.splitPct}% de ${formatCurrency(m.requestedAmount ?? m.amount)}` : ''}` : ''; })()}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className={`text-sm font-bold tabular-nums ${m.type === 'saque' ? 'text-[#D4AF37]' : 'text-[#D99AAA]'}`}>
@@ -109,7 +110,7 @@ export function Finances() {
         )}
       </section>
 
-      <MovementModal type={modalType} onClose={() => setModalType(null)} onSave={(v, d) => { addMovement({ type: modalType!, amount: v, description: d }); setModalType(null); }} />
+      <MovementModal type={modalType} fundedAccounts={fundedAccounts} onClose={() => setModalType(null)} onSave={(payload) => { addMovement({ type: modalType!, ...payload }); setModalType(null); }} />
     </div>
   );
 }
@@ -137,29 +138,67 @@ function SummaryCard({ label, value, icon, tone, highlight }: { label: string; v
   );
 }
 
-function MovementModal({ type, onClose, onSave }: { type: MovementType | null; onClose: () => void; onSave: (amount: number, description: string) => void }) {
+function MovementModal({ type, fundedAccounts, onClose, onSave }: { type: MovementType | null; fundedAccounts: Account[]; onClose: () => void; onSave: (payload: { amount: number; description: string; accountId?: string; requestedAmount?: number; splitPct?: number }) => void }) {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [splitPct, setSplitPct] = useState('85');
   if (!type) return null;
   const isSaque = type === 'saque';
+  const requested = parseFloat(amount.replace(',', '.'));
+  const pct = parseFloat(splitPct.replace(',', '.'));
+  const received = isSaque && Number.isFinite(requested) && Number.isFinite(pct) ? requested * (pct / 100) : requested;
+  const canSubmit = isSaque
+    ? Number.isFinite(requested) && requested > 0 && Number.isFinite(pct) && pct > 0 && pct <= 100 && !!accountId
+    : Number.isFinite(requested) && requested > 0 && !!description.trim();
   const submit = () => {
-    const val = parseFloat(amount.replace(',', '.'));
-    if (isNaN(val) || !description.trim()) return;
-    onSave(val, description.trim());
-    setAmount(''); setDescription('');
+    if (!canSubmit) return;
+    if (isSaque) {
+      const account = fundedAccounts.find((a) => a.id === accountId);
+      const desc = description.trim() || `Saque - ${account?.name ?? 'Conta'}`;
+      onSave({ amount: received, description: desc, accountId, requestedAmount: requested, splitPct: pct });
+    } else {
+      onSave({ amount: requested, description: description.trim() });
+    }
+    setAmount(''); setDescription(''); setAccountId(''); setSplitPct('85');
   };
   return (
     <Modal open={!!type} onClose={onClose} title={isSaque ? 'Registrar Saque' : 'Registrar Investimento'}>
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Valor (USD)</label>
-          <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))} placeholder="Ex: 150.00" className="input" />
+        {isSaque && (
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Conta (carteira financiada)</label>
+            {fundedAccounts.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#302F35] bg-[#111115] p-3 text-xs text-gray-600">Você ainda não tem nenhuma conta financiada disponível para saque.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {fundedAccounts.map((a) => (
+                  <button key={a.id} type="button" onClick={() => setAccountId(a.id)} className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${accountId === a.id ? 'border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#D4AF37]' : 'border-[#2C2C2C] bg-[#111115] text-gray-400'}`}>{a.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <div className={isSaque ? 'grid grid-cols-2 gap-3' : ''}>
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">{isSaque ? 'Valor Solicitado (USD)' : 'Valor (USD)'}</label>
+            <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))} placeholder="Ex: 150.00" className="input" />
+          </div>
+          {isSaque && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">% de Repasse</label>
+              <input type="text" inputMode="decimal" value={splitPct} onChange={(e) => setSplitPct(e.target.value.replace(/[^0-9.,]/g, ''))} placeholder="Ex: 85" className="input" />
+            </div>
+          )}
         </div>
+        {isSaque && Number.isFinite(requested) && requested > 0 && Number.isFinite(pct) && pct > 0 && (
+          <div className="rounded-xl border border-[#514A2B] bg-[#17150E] px-3.5 py-3 text-xs text-gray-400">Você vai receber de verdade <span className="font-bold text-[#D4AF37]">{formatCurrency(received)}</span> ({pct}% de {formatCurrency(requested)}). O valor cheio é descontado do resultado da conta.</div>
+        )}
         <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Descrição</label>
+          <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Descrição {isSaque && <span className="normal-case font-normal text-gray-600">(opcional)</span>}</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={isSaque ? 'Ex: Payout PnL Global' : 'Ex: Inscrição Teste'} className="input" />
         </div>
-        <button onClick={submit} disabled={!amount || !description.trim()} className={`w-full py-3.5 rounded-2xl font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${isSaque ? 'bg-[#D4AF37] text-[#0B0B0D] hover:bg-[#E4C35A]' : 'bg-[#D99AAA] text-[#0B0B0D] hover:bg-[#E5ADBC]'}`}>Salvar</button>
+        <button onClick={submit} disabled={!canSubmit} className={`w-full py-3.5 rounded-2xl font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${isSaque ? 'bg-[#D4AF37] text-[#0B0B0D] hover:bg-[#E4C35A]' : 'bg-[#D99AAA] text-[#0B0B0D] hover:bg-[#E5ADBC]'}`}>Salvar</button>
       </div>
     </Modal>
   );

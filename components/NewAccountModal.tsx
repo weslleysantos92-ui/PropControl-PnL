@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { BarChart3, Check, Crown, Gem, Plus, ShieldCheck, Sparkles, Trophy, UserRound, UserRoundPlus, BadgeCheck } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { BarChart3, Building2, Check, Crown, Gem, Plus, ShieldCheck, Sparkles, Trophy, UserRound, UserRoundPlus, BadgeCheck } from 'lucide-react';
 import { Modal } from './Modal';
-import { FUNDING_PIPS_FLEX_SIZES, SIZE_COLORS, type AccountSize } from '../types';
+import { ACCOUNT_SIZES, SIZE_COLORS, type AccountSize } from '../types';
 import { useApp } from '../store';
 
 const SIZE_ICONS: Record<AccountSize, typeof Gem> = {
@@ -14,17 +14,37 @@ const SIZE_ICONS: Record<AccountSize, typeof Gem> = {
 };
 
 export function NewAccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { addAccount } = useApp();
+  const { addAccount, propFirms } = useApp();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [size, setSize] = useState<AccountSize>('25K');
+  const [firmId, setFirmId] = useState<string>('');
+  const [size, setSize] = useState<AccountSize | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
-  const save = () => {
-    if (!name.trim() || !code.trim()) return;
-    addAccount({ name: name.trim(), code: code.trim(), size });
+  const activeFirm = propFirms.find(f => f.id === firmId);
+  const availableSizes = useMemo(() => {
+    if (!activeFirm) return [] as AccountSize[];
+    const sizes = new Set<AccountSize>();
+    activeFirm.programs.forEach(p => p.sizes.forEach(s => sizes.add(s)));
+    return ACCOUNT_SIZES.filter(s => sizes.has(s));
+  }, [activeFirm]);
+
+  const selectFirm = (id: string) => {
+    setFirmId(id);
+    setSize(null);
+  };
+
+  const save = async () => {
+    if (!name.trim() || !code.trim() || !firmId || !size || saving) return;
+    setSaving(true); setSaveError('');
+    const response = await addAccount({ name: name.trim(), code: code.trim(), size, firmId });
+    setSaving(false);
+    if (!response.ok) { setSaveError(`Não foi possível salvar a conta. ${response.error || 'Verifique a conexão com o banco de dados.'}`); return; }
     setName('');
     setCode('');
-    setSize('25K');
+    setSize(null);
+    setFirmId('');
     onClose();
   };
 
@@ -39,7 +59,7 @@ export function NewAccountModal({ open, onClose }: { open: boolean; onClose: () 
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-black uppercase tracking-tight text-[#D4AF37]">Nova Conta</h2>
-              <p className="mt-0.5 text-xs text-gray-400">Cadastre uma nova conta FundingPips</p>
+              <p className="mt-0.5 text-xs text-gray-400">Cadastre uma nova conta em uma mesa proprietária</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Fechar" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 text-gray-500 transition hover:border-[#D4AF37]/40 hover:text-white">×</button>
           </div>
@@ -75,11 +95,37 @@ export function NewAccountModal({ open, onClose }: { open: boolean; onClose: () 
 
         <div>
           <div className="mb-3 flex items-center gap-2 px-1">
+            <Building2 size={19} className="text-[#D4AF37]" />
+            <p className="text-sm font-bold uppercase tracking-wider text-[#D4AF37]">Mesa proprietária</p>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {propFirms.map(firm => {
+              const active = firmId === firm.id;
+              return (
+                <button
+                  key={firm.id}
+                  type="button"
+                  onClick={() => selectFirm(firm.id)}
+                  aria-pressed={active}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition-all ${active ? 'border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#D4AF37] shadow-[0_0_18px_rgba(212,175,55,0.1)]' : 'border-white/[0.08] bg-[#0E0F11] text-gray-300 hover:border-white/[0.16]'}`}
+                >
+                  {firm.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-3 flex items-center gap-2 px-1">
             <BarChart3 size={19} className="text-[#D4AF37]" />
             <p className="text-sm font-bold uppercase tracking-wider text-[#D4AF37]">Tamanho do capital</p>
           </div>
+          {!firmId ? (
+            <p className="rounded-2xl border border-white/[0.08] bg-[#0E0F11] px-4 py-5 text-center text-sm text-gray-500">Escolha uma mesa acima para ver os tamanhos disponíveis.</p>
+          ) : (
           <div className="grid grid-cols-4 gap-2.5">
-            {FUNDING_PIPS_FLEX_SIZES.map(s => {
+            {availableSizes.map(s => {
               const colors = SIZE_COLORS[s];
               const Icon = SIZE_ICONS[s];
               const active = size === s;
@@ -98,6 +144,7 @@ export function NewAccountModal({ open, onClose }: { open: boolean; onClose: () 
               );
             })}
           </div>
+          )}
         </div>
 
         <div>
@@ -114,8 +161,9 @@ export function NewAccountModal({ open, onClose }: { open: boolean; onClose: () 
           </div>
         </div>
 
-        <button onClick={save} disabled={!name.trim() || !code.trim()} className="group relative w-full overflow-hidden rounded-2xl border border-[#D4AF37]/70 bg-gradient-to-r from-[#B98B20] via-[#D4AF37] to-[#B98B20] py-4 font-black uppercase tracking-[0.18em] text-[#090909] shadow-[0_0_28px_rgba(212,175,55,0.16)] transition-all hover:shadow-[0_0_34px_rgba(212,175,55,0.26)] disabled:cursor-not-allowed disabled:opacity-40">
-          <span className="relative flex items-center justify-center gap-3"><Plus size={21} strokeWidth={2.8} /> Cadastrar Conta</span>
+        {saveError && <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-5 text-red-300">{saveError}</div>}
+        <button onClick={save} disabled={!name.trim() || !code.trim() || !firmId || !size || saving} className="group relative w-full overflow-hidden rounded-2xl border border-[#D4AF37]/70 bg-gradient-to-r from-[#B98B20] via-[#D4AF37] to-[#B98B20] py-4 font-black uppercase tracking-[0.18em] text-[#090909] shadow-[0_0_28px_rgba(212,175,55,0.16)] transition-all hover:shadow-[0_0_34px_rgba(212,175,55,0.26)] disabled:cursor-not-allowed disabled:opacity-40">
+          <span className="relative flex items-center justify-center gap-3"><Plus size={21} strokeWidth={2.8} /> {saving ? 'SALVANDO...' : 'Cadastrar Conta'}</span>
         </button>
       </div>
     </Modal>

@@ -12,14 +12,21 @@ export type JourneyObjectiveType = 'financeiro' | 'profissional' | 'pessoal' | '
 
 export interface Account {
   id: string; name: string; code: string; size: AccountSize; status: AccountStatus;
-  propFirm?: string; phase?: AccountPhase;
+  propFirm?: string; firmId?: string; phase?: AccountPhase;
   createdAt: number; queueOrder: number; fundedAt?: number;
 }
 export interface Trade {
   id: string; accountId: string; asset: Asset; context: Context; timeframe: Timeframe;
-  result: TradeResult; amount: number; note?: string; timestamp: number; phase?: AccountPhase;
+  result: TradeResult; amount: number; riskAmount: number; note?: string; timestamp: number; phase?: AccountPhase;
 }
-export interface Movement { id: string; type: MovementType; amount: number; description: string; timestamp: number; }
+/** Retorno em múltiplos de risco (R). Ex.: arriscou 150 e ganhou 450 = 3R. */
+export function tradeR(trade: Pick<Trade, 'amount' | 'riskAmount'>): number {
+  return trade.riskAmount > 0 ? trade.amount / trade.riskAmount : 0;
+}
+export interface Movement {
+  id: string; type: MovementType; amount: number; description: string; timestamp: number;
+  accountId?: string; requestedAmount?: number; splitPct?: number;
+}
 export interface AppData { accounts: Account[]; trades: Trade[]; movements: Movement[]; seeded: boolean; }
 
 export interface JourneyObjective {
@@ -33,10 +40,12 @@ export interface JourneyObjective {
   description?: string;
   completed: boolean;
   completedAt?: number;
+  createdAt: number;
 }
 export interface JourneyState {
   startedAt?: number;
   unlockedAchievements: string[];
+  achievementDates?: Record<string, number>;
   objective?: JourneyObjective | null;
 }
 
@@ -47,6 +56,7 @@ export const TRADE_RESULTS: TradeResult[] = ['Take', 'Stop', 'BE'];
 export const ACCOUNT_SIZES: AccountSize[] = ['5K', '10K', '25K', '50K', '100K', '150K'];
 export const FUNDING_PIPS_FLEX_SIZES: AccountSize[] = ['10K', '25K', '50K', '100K'];
 export const ACCOUNT_STATUSES: AccountStatus[] = ['Avaliacao', 'Financiada', 'Reprovada'];
+export const DEFAULT_FIRM_ID = 'official-fundingpips';
 export const SIZE_VALUES: Record<AccountSize, number> = { '5K': 5000, '10K': 10000, '25K': 25000, '50K': 50000, '100K': 100000, '150K': 150000 };
 
 export const EVALUATION_TARGET_PCT = Object.assign(
@@ -74,6 +84,16 @@ export const SIZE_COLORS: Record<AccountSize, AccountColor> = {
   '150K': { soft: 'bg-size150-soft', text: 'text-size150-text', ring: 'ring-size150-ring', dot: 'bg-size150', label: 'Verde Esmeralda' },
 };
 export function getAccountColor(size: AccountSize): AccountColor { return SIZE_COLORS[size]; }
+export interface SizeHex { solid: string; soft: string; ring: string; }
+/** Mesmas cores de SIZE_COLORS, em hexadecimal/rgba puro - para telas que usam style inline em vez de classes Tailwind (ex.: Dashboard). */
+export const SIZE_HEX: Record<AccountSize, SizeHex> = {
+  '5K': { solid: '#3b82f6', soft: 'rgba(59, 130, 246, 0.14)', ring: 'rgba(59, 130, 246, 0.35)' },
+  '10K': { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.14)', ring: 'rgba(37, 99, 235, 0.42)' },
+  '25K': { solid: '#06b6d4', soft: 'rgba(6, 182, 212, 0.14)', ring: 'rgba(6, 182, 212, 0.42)' },
+  '50K': { solid: '#a855f7', soft: 'rgba(168, 85, 247, 0.14)', ring: 'rgba(168, 85, 247, 0.35)' },
+  '100K': { solid: '#f59e0b', soft: 'rgba(245, 158, 11, 0.14)', ring: 'rgba(245, 158, 11, 0.35)' },
+  '150K': { solid: '#10b981', soft: 'rgba(16, 185, 129, 0.14)', ring: 'rgba(16, 185, 129, 0.35)' },
+};
 export function getAccountPhaseLabel(status: AccountStatus, phase?: AccountPhase): string {
   if (status === 'Reprovada') return 'Reprovada';
   if (status === 'Financiada') return 'Master';

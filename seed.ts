@@ -12,9 +12,9 @@ export function seedData(): AppData {
   ].map((a, i) => ({ id: uid(), ...a, createdAt: now - (3 - i) * DAY, queueOrder: i }));
 
   const trades = [
-    { id: uid(), accountId: accounts[0].id, asset: 'MNQ' as const, context: 'Captura de Liquidez' as const, timeframe: 'M5' as const, result: 'Take' as const, amount: 45, note: 'Limpo, respeitei o plano.', timestamp: now - 2 * DAY + 13 * 60 * 60 * 1000 },
-    { id: uid(), accountId: accounts[1].id, asset: 'NQ' as const, context: 'Rompimento' as const, timeframe: 'M15' as const, result: 'Stop' as const, amount: -60, note: 'Entrei cedo, paciência da próxima.', timestamp: now - DAY + 15 * 60 * 60 * 1000 },
-    { id: uid(), accountId: accounts[0].id, asset: 'MGC' as const, context: 'Estrutura Wyckoff' as const, timeframe: 'M15' as const, result: 'Take' as const, amount: 80, note: 'Boa leitura de fluxo.', timestamp: now - DAY + 19 * 60 * 60 * 1000 },
+    { id: uid(), accountId: accounts[0].id, asset: 'MNQ' as const, context: 'Captura de Liquidez' as const, timeframe: 'M5' as const, result: 'Take' as const, amount: 45, riskAmount: 20, note: 'Limpo, respeitei o plano.', timestamp: now - 2 * DAY + 13 * 60 * 60 * 1000 },
+    { id: uid(), accountId: accounts[1].id, asset: 'NQ' as const, context: 'Rompimento' as const, timeframe: 'M15' as const, result: 'Stop' as const, amount: -60, riskAmount: 60, note: 'Entrei cedo, paciência da próxima.', timestamp: now - DAY + 15 * 60 * 60 * 1000 },
+    { id: uid(), accountId: accounts[0].id, asset: 'MGC' as const, context: 'Estrutura Wyckoff' as const, timeframe: 'M15' as const, result: 'Take' as const, amount: 80, riskAmount: 30, note: 'Boa leitura de fluxo.', timestamp: now - DAY + 19 * 60 * 60 * 1000 },
   ];
 
   const movements = [

@@ -14,6 +14,7 @@ export const FUNDING_PIPS_RULES = {
   },
   minimumProfitableDays: 3,
   profitableDayPct: 0.5,
+  payoutCycleDays: 14,
 } as const;
 
 export const FUNDING_PIPS_FLEX_SIZES = FUNDING_PIPS_RULES.accountSizes.map(size => ({
