@@ -35,6 +35,8 @@ interface AppContextValue {
 }
 const AppContext = createContext<AppContextValue | null>(null);
 const EMPTY_DATA: AppData = { accounts: [], trades: [], movements: [], seeded: true };
+// TEMPORÁRIO (apenas para visualizar o Preview sem login). Reverter para `false` antes de publicar.
+const PREVIEW_BYPASS_AUTH = true;
 
 const TRADE_MILESTONES = [25, 50, 100, 250, 500, 1000] as const;
 const DAY_MILESTONES = [30, 90, 180, 365] as const;
@@ -97,7 +99,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setData(EMPTY_DATA); setJourneyState(null); setPropFirms([]); setLoading(false); return; }
+    if (!user) {
+      // TEMPORÁRIO (apenas para visualizar o Preview sem login): usa dados mockados locais.
+      // Reverter esta condição antes de publicar em produção.
+      if (PREVIEW_BYPASS_AUTH) { setData(seedData()); setPropFirms(officialFirmsFallback()); setLoading(false); return; }
+      setData(EMPTY_DATA); setJourneyState(null); setPropFirms([]); setLoading(false); return;
+    }
     let cancelled = false;
     setLoading(true);
     (async () => {
