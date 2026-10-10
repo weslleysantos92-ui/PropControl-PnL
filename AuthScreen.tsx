@@ -26,20 +26,13 @@ export function AuthScreen() {
     >
       {/* Logo */}
       <div className="flex flex-col items-center gap-1 mb-10">
-        <div
-          className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
-          style={{
-            background: 'linear-gradient(135deg, #D4AF37 0%, #a8862a 100%)',
-            boxShadow: '0 0 24px rgba(212,175,55,0.4)',
-          }}
-        >
-          <span
-            className="text-black font-extrabold text-2xl leading-none"
-            style={{ fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em' }}
-          >
-            P
-          </span>
-        </div>
+        <img
+          src="/propcontrol-logo.png"
+          alt="PropControl"
+          className="mb-3 h-24 w-auto select-none"
+          style={{ filter: 'drop-shadow(0 0 18px rgba(212,175,55,0.35))' }}
+          draggable={false}
+        />
         <span
           className="text-xl font-extrabold"
           style={{ color: '#F5F5F5', fontFamily: 'Manrope, sans-serif', letterSpacing: '0.12em' }}
