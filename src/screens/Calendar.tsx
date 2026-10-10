@@ -1,10 +1,22 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Trophy } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Trophy, TrendingUp, TrendingDown, DollarSign, X } from 'lucide-react';
 import { useApp } from '@/store';
 import { operationalDay, dateKey, parseDateKey, formatTime, formatSignedCurrency, WEEKDAYS, MONTHS } from '@/dates';
 import type { Trade } from '@/types';
 import { tradeR } from '@/types';
 import { BottomSheet } from '@/components/Modal';
+
+/** Ícone próprio da tela: calendário com seta de alta dentro (não existe no lucide). */
+function CalendarTrendIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M8 18l3.2-3.2 2 2L17 13" />
+      <path d="M14.5 13H17v2.5" />
+    </svg>
+  );
+}
 
 export function Calendar() {
   const { trades, accounts } = useApp();
@@ -54,72 +66,135 @@ export function Calendar() {
   }, [dayMap, year, month]);
 
   return (
-    <div className="pc-calendar min-h-full bg-[#0A0A0A] px-4 pt-5 pb-28 text-white md:px-6">
-      <div className="mx-auto max-w-5xl space-y-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="pc-calendar calendar-page min-h-full px-3 pt-4 pb-28 text-white md:px-6 md:pt-6">
+      <div className="mx-auto max-w-[1040px] space-y-5">
+        <div className="flex items-end justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-[#D4AF37]"><CalendarDays size={18} /><span className="text-[10px] font-semibold uppercase tracking-[0.22em]">Performance</span></div>
-            <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
-            <p className="mt-1 text-sm text-gray-500">Seu histórico diário de performance.</p>
+            <div className="flex items-center gap-3">
+              <div className="calendar-title-icon"><CalendarTrendIcon size={22} /></div>
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight text-white md:text-3xl">Calendário</h1>
+                <p className="mt-1 text-xs text-slate-400">Seu histórico diário de performance.</p>
+              </div>
+            </div>
           </div>
-          <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="w-full appearance-none rounded-xl border border-white/[0.08] bg-[#111214] px-4 py-3 text-sm text-gray-200 outline-none focus:border-[#D4AF37]/50 md:w-56">
+          <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="calendar-filter shrink-0 appearance-none rounded-xl border border-[#232329] bg-[#111113] px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-[#D4AF37] md:w-56">
             <option value="all">Todas as contas</option>
             {accounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.status === 'Reprovada' ? ' (Reprovada)' : ''}</option>)}
           </select>
         </div>
 
-        <section className="rounded-2xl border border-white/[0.07] bg-[#101112] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] md:p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-[#151617] text-gray-400 transition-colors hover:border-[#D4AF37]/30 hover:text-white"><ChevronLeft size={18} /></button>
-            <div className="text-center"><h2 className="text-lg font-semibold capitalize">{MONTHS[month]} {year}</h2><span className="text-[11px] text-gray-600">{filteredTrades.length} trades registrados</span></div>
-            <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-[#151617] text-gray-400 transition-colors hover:border-[#D4AF37]/30 hover:text-white"><ChevronRight size={18} /></button>
+        <section className="calendar-hero relative overflow-hidden rounded-[24px] border p-5 shadow-[0_18px_60px_rgba(0,0,0,.28)] md:p-7">
+          <div className="calendar-hero-glow" />
+          <div className="relative flex items-center justify-between gap-4">
+            <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#232329] bg-[#111113] text-slate-400 transition hover:border-[#D4AF37]/50 hover:text-[#D4AF37]"><ChevronLeft size={20} /></button>
+            <div className="text-center">
+              <h2 className="text-xl font-extrabold capitalize text-white md:text-2xl">{MONTHS[month]} <span className="text-[#D4AF37]">{year}</span></h2>
+              <span className="mt-1 inline-block text-[11px] text-slate-500">{filteredTrades.length} trades registrados</span>
+            </div>
+            <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#232329] bg-[#111113] text-slate-400 transition hover:border-[#D4AF37]/50 hover:text-[#D4AF37]"><ChevronRight size={20} /></button>
           </div>
+        </section>
 
-          <div className="mb-1 grid grid-cols-7 gap-1"><>{WEEKDAYS.map(w => <div key={w} className="py-2 text-center text-[10px] font-medium uppercase tracking-wider text-gray-600">{w}</div>)}</></div>
+        <section className="calendar-stats grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="calendar-stat-card">
+            <div className="calendar-stat-icon stat-icon-round" style={{ borderColor: 'rgba(212,175,55,.45)', color: '#D4AF37' }}><DollarSign size={16} /></div>
+            <div><p className="calendar-stat-label">Resultado do mês</p><p className={`calendar-stat-value ${monthStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(monthStats.pnl)}</p></div>
+          </div>
+          <div className="calendar-stat-card">
+            <div className="calendar-stat-icon" style={{ borderColor: 'rgba(52,211,153,.35)', color: '#34d399' }}><TrendingUp size={16} /></div>
+            <div><p className="calendar-stat-label">Dias no gain</p><p className="calendar-stat-value text-emerald-400">{monthStats.gains}</p></div>
+          </div>
+          <div className="calendar-stat-card">
+            <div className="calendar-stat-icon" style={{ borderColor: 'rgba(248,113,113,.35)', color: '#f87171' }}><TrendingDown size={16} /></div>
+            <div><p className="calendar-stat-label">Dias no loss</p><p className="calendar-stat-value text-red-400">{monthStats.losses}</p></div>
+          </div>
+        </section>
+
+        <section className="calendar-grid-section relative overflow-hidden rounded-[24px] border border-[#232329] bg-[#0D0D10] p-4 shadow-[0_18px_60px_rgba(0,0,0,.28)] md:p-6">
+          <div className="mb-2 grid grid-cols-7 gap-1">{WEEKDAYS.map(w => <div key={w} className="py-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">{w}</div>)}</div>
           <div className="grid grid-cols-7 gap-1.5 md:gap-2">
             {cells.map((day, i) => {
-              if (day === null) return <div key={i} className="aspect-square" />;
+              if (day === null) return <div key={i} className="calendar-day-empty-cell" />;
               const key = dateKey(new Date(year, month, day));
               const entry = dayMap.get(key);
               const isToday = key === todayKey;
               const positive = !!entry && entry.total > 0;
               const negative = !!entry && entry.total < 0;
-              return <button key={i} onClick={() => setSelectedDay(key)} className={`relative flex aspect-square flex-col items-center justify-center rounded-xl border transition-all hover:scale-[1.02] ${isToday ? 'today-shimmer border-[#D4AF37]/70 bg-[#17140A]' : positive ? 'border-emerald-500/20 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.10]' : negative ? 'border-red-500/20 bg-red-500/[0.06] hover:bg-red-500/[0.10]' : 'border-white/[0.035] bg-[#0D0E0F] hover:border-white/[0.09]'}`}>
-                <span className={`text-sm font-medium ${isToday ? 'text-[#D4AF37]' : positive ? 'text-emerald-400' : negative ? 'text-red-400' : 'text-gray-400'}`}>{day}</span>
-                {entry && <span className={`mt-1 text-[8px] font-semibold md:text-[9px] ${positive ? 'text-emerald-400/80' : negative ? 'text-red-400/80' : 'text-gray-500'}`}>{entry.count}t</span>}
-              </button>;
+              return (
+                <button key={i} onClick={() => setSelectedDay(key)} className={`calendar-day-cell relative flex flex-col items-center justify-center rounded-[14px] border transition-all duration-200 hover:scale-[1.03] ${isToday ? 'calendar-today border-[#D4AF37]/70 bg-[#D4AF37]/[0.08]' : positive ? 'calendar-day-win border-[#34D399] bg-[#34D399]/[0.30] hover:bg-[#34D399]/[0.38]' : negative ? 'calendar-day-loss border-[#F87171] bg-[#F87171]/[0.30] hover:bg-[#F87171]/[0.38]' : 'border-[#232329] bg-[#111113] hover:border-[#34343c]'}`}>
+                  <span className={`text-[13px] font-semibold md:text-[15px] ${isToday ? 'text-[#D4AF37]' : positive ? 'text-[#6EF2C0]' : negative ? 'text-[#FF9A9A]' : 'text-slate-400'}`}>{day}</span>
+                  {entry && <span className={`mt-0.5 text-[9px] font-bold md:mt-1 md:text-[10px] ${positive ? 'text-[#6EF2C0]/90' : negative ? 'text-[#FF9A9A]/90' : 'text-slate-600'}`}>{entry.count}t</span>}
+                </button>
+              );
             })}
           </div>
-
-          <div className="mt-5 flex items-center justify-center gap-4 border-t border-white/[0.05] pt-4 text-[10px] text-gray-500 md:gap-5">
-            <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-emerald-500/70" /> Gain</span>
-            <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-red-500/70" /> Loss</span>
-            <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full border border-[#D4AF37]" /> Hoje</span>
+          <div className="mt-5 flex items-center justify-center gap-4 border-t border-[#232329] pt-4 text-[10px] text-slate-500 md:gap-5">
+            <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#34D399]" /> Gain</span>
+            <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#F87171]" /> Loss</span>
+            <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full border border-[#D4AF37]" /> Hoje</span>
           </div>
-        </section>
-
-        <section className="pc-calendar-summary grid grid-cols-3 gap-2 md:gap-3">
-          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Resultado do mês</span><span className={`mt-2 text-base font-bold md:text-xl ${monthStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(monthStats.pnl)}</span></div>
-          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Gain</span><span className="mt-2 text-base font-bold text-emerald-400 md:text-xl">{monthStats.gains}</span></div>
-          <div className="flex min-h-[92px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-[#101112] p-3 text-center md:p-4"><span className="text-[10px] uppercase tracking-wider text-gray-600">Dias no Loss</span><span className="mt-2 text-base font-bold text-red-400 md:text-xl">{monthStats.losses}</span></div>
         </section>
       </div>
 
       <BottomSheet open={!!selectedDay} onClose={() => setSelectedDay(null)}>
-        {selectedDay && <div>
-          <h3 className="mb-1 text-lg font-bold text-white">{parseDateKey(selectedDay).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</h3>
-          {selectedEntry ? <>
-            <div className="mb-4 flex items-center gap-3"><div className={`rounded-xl px-3 py-1.5 text-sm font-bold ${selectedEntry.total >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{formatSignedCurrency(selectedEntry.total)}</div><span className="text-sm text-gray-400">{selectedEntry.count} trade{selectedEntry.count > 1 ? 's' : ''}</span></div>
-            <div className="space-y-2">{selectedEntry.trades.sort((a, b) => a.timestamp - b.timestamp).map(t => <div key={t.id} className="rounded-xl border border-white/[0.06] bg-[#0D0E0F] p-3">
-              <div className="mb-1 flex items-center justify-between"><div className="flex items-center gap-2"><span className={`rounded-md px-2 py-0.5 text-xs font-bold ${t.result === 'Take' ? 'bg-emerald-500/10 text-emerald-400' : t.result === 'Stop' ? 'bg-red-500/10 text-red-400' : 'bg-white/[0.05] text-gray-300'}`}>{t.result}</span><span className="text-xs font-semibold text-gray-300">{t.asset}</span><span className="text-xs text-gray-600">{formatTime(t.timestamp)}</span></div><div className="flex items-center gap-1.5"><span className={`text-sm font-bold ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(t.amount)}</span><span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${tradeR(t) >= 0 ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-400' : 'border-red-500/25 bg-red-500/[0.08] text-red-400'}`}>{tradeR(t) >= 0 ? '+' : ''}{tradeR(t).toFixed(1)}R</span></div></div>
-              <p className="text-xs text-gray-400">{accountName(t.accountId)} · {t.context} · {t.timeframe}</p>{t.note && <p className="mt-1 text-xs italic text-gray-500">"{t.note}"</p>}
-            </div>)}</div>
-            {selectedEntry.total > 0 && <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#D4AF37]/15 bg-[#D4AF37]/[0.04] p-3 text-xs text-[#D4AF37]"><Trophy size={15} /> Dia encerrado no lucro.</div>}
-          </> : <p className="text-sm text-gray-500">Nenhum trade registrado neste dia.</p>}
-        </div>}
+        {selectedDay && (
+          <div className="calendar-day-sheet">
+            <div className="calendar-day-sheet-header">
+              <div className="calendar-day-sheet-date">
+                <span className="calendar-day-sheet-day">{parseDateKey(selectedDay).toLocaleDateString('pt-BR', { day: '2-digit' })}</span>
+                <span className="calendar-day-sheet-month">{parseDateKey(selectedDay).toLocaleDateString('pt-BR', { month: 'long' })}</span>
+              </div>
+              <button onClick={() => setSelectedDay(null)} className="calendar-day-sheet-close"><X size={20} /></button>
+            </div>
+            {selectedEntry ? <>
+              <div className="calendar-day-sheet-summary">
+                <div className="calendar-day-sheet-stat">
+                  <span className="calendar-day-sheet-stat-label">Resultado do dia</span>
+                  <span className={`calendar-day-sheet-stat-value ${selectedEntry.total >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(selectedEntry.total)}</span>
+                </div>
+                <div className="calendar-day-sheet-divider" />
+                <div className="calendar-day-sheet-stat">
+                  <span className="calendar-day-sheet-stat-label">Trades</span>
+                  <span className="calendar-day-sheet-stat-value text-white">{selectedEntry.count}</span>
+                </div>
+                <div className="calendar-day-sheet-divider" />
+                <div className="calendar-day-sheet-stat">
+                  <span className="calendar-day-sheet-stat-label">Média/trade</span>
+                  <span className={`calendar-day-sheet-stat-value ${(selectedEntry.total / selectedEntry.count) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(selectedEntry.total / selectedEntry.count)}</span>
+                </div>
+              </div>
+              <div className="space-y-2.5">
+                {selectedEntry.trades.sort((a, b) => a.timestamp - b.timestamp).map(t => (
+                  <div key={t.id} className="calendar-trade-row rounded-xl border border-[#232329] bg-[#111113] p-3.5 transition hover:border-[#34343c]">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`calendar-trade-badge ${t.result === 'Take' ? 'badge-gain' : t.result === 'Stop' ? 'badge-loss' : 'badge-neutral'}`}>{t.result}</span>
+                        <span className="text-sm font-semibold text-slate-200">{t.asset}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-600">{formatTime(t.timestamp)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-slate-500">{accountName(t.accountId)} · {t.context} · {t.timeframe}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-extrabold ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(t.amount)}</span>
+                        <span className={`calendar-trade-r ${tradeR(t) >= 0 ? 'r-positive' : 'r-negative'}`}>{tradeR(t) >= 0 ? '+' : ''}{tradeR(t).toFixed(1)}R</span>
+                      </div>
+                    </div>
+                    {t.note && <p className="mt-2 border-t border-[#232329] pt-2 text-xs italic text-slate-500">"{t.note}"</p>}
+                  </div>
+                ))}
+              </div>
+              {selectedEntry.total > 0 && <div className="calendar-day-badge-win"><Trophy size={15} /> Dia encerrado no lucro.</div>}
+            </> : (
+              <div className="calendar-day-empty">
+                <CalendarDays size={28} className="text-slate-700" />
+                <p className="mt-3 text-sm text-slate-500">Nenhum trade registrado neste dia.</p>
+              </div>
+            )}
+          </div>
+        )}
       </BottomSheet>
-
-      <style>{`@keyframes shimmerToday { 0%,100% { box-shadow: inset -80px 0 70px -80px rgba(212,175,55,0); } 50% { box-shadow: inset 80px 0 70px -80px rgba(212,175,55,.35); } } .today-shimmer { animation: shimmerToday 3s ease-in-out infinite; }`}</style>
     </div>
   );
 }

@@ -1,0 +1,481 @@
+/* ============================================================
+   AccountDetail — folha de estilos completa (Diário de Trades)
+   Importe uma vez, dentro de src/screens/AccountDetail.tsx.
+   Paleta alinhada ao restante do PropControl: preto neutro (sem
+   tom de azul) + dourado de destaque + verde/azul/vermelho de status.
+   fundo #0B0B0D · card #111113 · dourado #D4AF37 · verde #34D399
+   vermelho #F87171 · azul #3B82F6 · borda #232329 · texto #F5F5F5
+   ============================================================ */
+
+   :root {
+    --radius: 0.5rem;
+    --background: #0B0B0D;
+    --foreground: #F5F5F5;
+    --card: #111113;
+    --surface: #0D0D10;
+    --secondary: #1A1A1E;
+    --muted: #1A1A1E;
+    --muted-foreground: #8A8A92;
+    --primary: #D4AF37;                          /* dourado */
+    --primary-foreground: #1A1400;
+    --destructive: #F87171;
+    --border: #232329;
+    --positive: #34D399;
+    --negative: #F87171;
+    --info: #3B82F6;
+  }
+  
+  /* ---------- base ---------- */
+  .account-shell {
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: 0;
+  }
+  .account-shell h1, .account-shell h2, .account-shell p { margin: 0; }
+  .account-shell button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .numeric { font-variant-numeric: tabular-nums; }
+  
+  .account-container { width: min(100% - 38px, 1180px); margin-inline: auto; }
+  .account-topbar {
+    height: 42px;
+    background: transparent;
+  }
+  .topbar-inner { display: flex; align-items: center; height: 100%; }
+  .account-content { padding-top: 0; padding-bottom: 25px; }
+  
+  /* ---------- cards ---------- */
+  .account-panel {
+    border: 1px solid color-mix(in oklch, var(--primary) 19%, var(--border));
+    border-radius: 11px;
+    background: linear-gradient(130deg, var(--surface), color-mix(in oklch, var(--surface), var(--background) 22%));
+    margin-top: 9px;
+  }
+  .section-heading {
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  /* ---------- card 1: identidade ---------- */
+  .account-identity { display: flex; align-items: center; gap: 15px; min-height: 70px; padding: 8px 12px; margin-top: 0; }
+  .identity-mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--primary);
+    border-radius: 50%;
+    color: var(--primary);
+    box-shadow: 0 0 17px color-mix(in oklch, var(--primary) 25%, transparent);
+  }
+  .identity-mark-icon { position: absolute; }
+  .identity-text { min-width: 0; flex: 1; }
+  .identity-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .identity-name { font-size: 17px; font-weight: 600; line-height: 22px; }
+  .identity-sub { margin-top: 4px; font-size: 12.5px; color: var(--muted-foreground); }
+  .account-code { margin-top: 3px; color: var(--muted-foreground); font-size: 11.5px; letter-spacing: 0.05em; }
+  .account-code span { color: var(--primary); font-weight: 500; }
+  .phase-pill {
+    border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent);
+    border-radius: 99px;
+    padding: 3px 11px;
+    background: color-mix(in oklch, var(--primary) 11%, transparent);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  
+  /* ---------- card 2: margem de risco ---------- */
+  .risk-panel { padding: 13px 16px 14px; }
+  .risk-axis { position: relative; margin: 60px 6px 0; }
+  .risk-bubble {
+    position: absolute;
+    bottom: calc(100% + 14px);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .risk-bubble-label { color: var(--muted-foreground); font-size: 11.5px; letter-spacing: 0.02em; }
+  .risk-bubble-value {
+    position: relative;
+    display: inline-block;
+    padding: 6px 18px 7px;
+    border: 1px solid #35353d;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #1c1c20, #111113);
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  .risk-bubble-value.amount-take { color: var(--positive); text-shadow: 0 0 12px color-mix(in oklch, var(--positive) 55%, transparent), 0 0 28px color-mix(in oklch, var(--positive) 30%, transparent); }
+  .risk-bubble-value.amount-stop { color: var(--negative); text-shadow: 0 0 12px color-mix(in oklch, var(--negative) 55%, transparent), 0 0 28px color-mix(in oklch, var(--negative) 30%, transparent); }
+  .risk-bubble-pointer {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 11px;
+    height: 11px;
+    transform: translateX(-50%) rotate(45deg);
+    border-right: 1px solid #35353d;
+    border-bottom: 1px solid #35353d;
+    background: #111113;
+  }
+  .risk-track { position: relative; }
+  .risk-glow {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    border-radius: 999px;
+    filter: blur(10px);
+    opacity: 0.55;
+    pointer-events: none;
+    animation: risk-neon 2.6s ease-in-out infinite;
+  }
+  .glow-red { left: -2px; width: 52%; background: linear-gradient(90deg, transparent, oklch(0.55 0.22 27)); }
+  .glow-blue { right: -2px; width: 46%; background: linear-gradient(270deg, oklch(0.2 0.06 260), oklch(0.55 0.2 255)); }
+  .risk-line {
+    position: relative;
+    z-index: 1;
+    height: 14px;
+    overflow: hidden;
+    border: 1px solid oklch(0.32 0.02 255 / 0.9);
+    border-radius: 999px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.06 0.01 255 / 0.65) 7px 9px),
+      linear-gradient(90deg, oklch(0.2 0.06 25) 0%, oklch(0.4 0.16 27) 34%, oklch(0.56 0.23 27) 49.6%, oklch(0.56 0.21 256) 50.4%, oklch(0.48 0.17 258) 72%, oklch(0.26 0.09 262) 100%);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 -2px 4px oklch(0 0 0 / 0.45);
+  }
+  .risk-sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 30%, oklch(1 0 0 / 0.28) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: risk-shine 3.2s ease-in-out 1s infinite;
+  }
+  .risk-cursor {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 15px;
+    height: 15px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, oklch(0.95 0.07 92), oklch(0.78 0.13 84) 60%, oklch(0.62 0.11 78));
+    box-shadow: 0 0 6px oklch(0.85 0.12 88 / 0.9), 0 0 18px 4px oklch(0.75 0.13 84 / 0.55), 0 0 0 3px oklch(0.1 0.01 255 / 0.8);
+    animation: risk-glow 2.4s ease-in-out infinite;
+    transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .risk-reflection {
+    display: block;
+    height: 11px;
+    margin: 5px 2px 0;
+    border-radius: 999px;
+    opacity: 0.45;
+    filter: blur(1.5px);
+    background: linear-gradient(90deg, oklch(0.2 0.06 25) 0%, oklch(0.4 0.16 27) 34%, oklch(0.56 0.23 27) 49.6%, oklch(0.56 0.21 256) 50.4%, oklch(0.48 0.17 258) 72%, oklch(0.26 0.09 262) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 80%);
+    mask-image: linear-gradient(to bottom, black, transparent 80%);
+  }
+  @keyframes risk-neon { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.8; } }
+  @keyframes risk-shine { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(230%); } }
+  @keyframes risk-glow {
+    0%, 100% { box-shadow: 0 0 6px oklch(0.85 0.12 88 / 0.9), 0 0 18px 4px oklch(0.75 0.13 84 / 0.55), 0 0 0 3px oklch(0.1 0.01 255 / 0.8); }
+    50% { box-shadow: 0 0 8px oklch(0.9 0.12 90 / 1), 0 0 26px 7px oklch(0.75 0.13 84 / 0.7), 0 0 0 3px oklch(0.1 0.01 255 / 0.8); }
+  }
+  .risk-labels { display: flex; justify-content: space-between; margin-top: 10px; color: var(--primary); font-size: 12px; font-weight: 600; }
+  .risk-remaining { display: flex; gap: 10px; margin-top: 14px; }
+  .risk-remaining-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .risk-remaining-label { font-size: 10.5px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .risk-remaining-value { margin-top: 2px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .risk-remaining-value.to-target { color: var(--primary); }
+  .risk-remaining-value.to-drawdown { color: var(--negative); }
+  .risk-remaining-value.hit { color: var(--positive); }
+  .risk-details { margin-top: 17px; border-top: 1px solid var(--border); }
+  .risk-detail { display: flex; align-items: center; gap: 15px; min-height: 46px; color: var(--foreground); font-size: 13px; }
+  .risk-detail + .risk-detail { border-top: 1px solid var(--border); padding-top: 10px; min-height: 49px; }
+  .detail-text { min-width: 0; flex: 1; }
+  .detail-strong { font-weight: 600; }
+  .detail-hint { margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
+  .detail-check { margin-left: auto; }
+  .progress-dots { display: flex; gap: 6px; margin-left: auto; }
+  .progress-dots i { width: 8px; height: 8px; border: 1px solid var(--info); border-radius: 50%; background: var(--info); }
+  
+  /* ---------- ícones circulares ---------- */
+  .detail-icon, .metric-icon, .trade-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+  }
+  .detail-icon { width: 27px; height: 27px; }
+  .icon-blue { color: var(--info); box-shadow: 0 0 8px color-mix(in oklch, var(--info) 34%, transparent); }
+  .icon-gold { color: var(--primary); box-shadow: 0 0 8px color-mix(in oklch, var(--primary) 36%, transparent); }
+  .icon-green, .icon-take { color: var(--positive); box-shadow: 0 0 8px color-mix(in oklch, var(--positive) 30%, transparent); }
+  .icon-red, .icon-stop { color: var(--negative); box-shadow: 0 0 8px color-mix(in oklch, var(--negative) 30%, transparent); }
+  .icon-neutral, .icon-even { color: var(--muted-foreground); }
+  
+  /* ---------- card 3: performance ---------- */
+  .performance-panel { padding: 13px 12px 9px; }
+  .performance-heading { margin-left: 4px; }
+  .performance-panel .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 9px; background: transparent; border: 0; border-radius: 0; overflow: visible; }
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    min-height: 61px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+  .metric-icon { width: 31px; height: 31px; }
+  .metric-body { min-width: 0; }
+  .metric .metric-label { margin: 0; color: var(--foreground); font-size: 11px; line-height: 14px; font-weight: 400; text-transform: none; white-space: nowrap; overflow: visible; text-overflow: clip; }
+  .metric .metric-value { margin: 4px 0 0; font-size: 17px; line-height: 19px; font-weight: 600; white-space: nowrap; overflow: visible; text-overflow: clip; }
+  .metric-dollar { font-size: 20px; line-height: 1; }
+  
+  /* ---------- card 4: histórico ---------- */
+  .history-panel { padding: 13px 16px 0; }
+  .history-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .history-count { font-size: 12px; color: var(--muted-foreground); }
+  .trade-list { margin-top: 11px; }
+  .trade-row {
+    display: grid;
+    grid-template-columns: 32px minmax(100px, 1fr) minmax(120px, 1.05fr) 84px 12px;
+    column-gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 14px 0 10px;
+    border-top: 1px solid #2E2E38 !important;
+    text-align: left;
+    font-weight: 400;
+    transition: background 0.15s;
+  }
+  .trade-row:hover { background: var(--secondary); }
+  .trade-icon { width: 30px; height: 30px; }
+  .trade-main { display: flex; flex-direction: column; min-width: 0; line-height: 15px; gap: 2px; }
+  .trade-asset-row { display: flex; align-items: center; gap: 6px; }
+  .trade-asset { font-size: 13px; font-weight: 600; color: var(--foreground); }
+  .trade-phase-badge { font-size: 8px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+  .trade-side { font-size: 12px; }
+  .trade-tags { color: var(--muted-foreground); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .trade-date { display: flex; align-items: center; gap: 7px; align-self: center; color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
+  .trade-amount { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; align-self: center; }
+  .trade-chevron { color: var(--muted-foreground); align-self: center; }
+  .date-separator { margin: 0 3px; }
+  
+  /* cores de resultado */
+  .amount-take, .side-take { color: var(--positive); }
+  .amount-stop, .side-stop { color: var(--negative); }
+  .amount-even { color: var(--foreground); }
+  .side-even { color: var(--muted-foreground); }
+  
+  /* ---------- card 5: status ---------- */
+  .status-panel { padding: 13px 16px 14px; }
+  .status-content { display: flex; align-items: center; gap: 12px; margin-top: 15px; }
+  .status-dot {
+    flex: none;
+    width: 13px;
+    height: 13px;
+    margin: 0 6px;
+    border-radius: 50%;
+    background: var(--positive);
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--positive) 10%, transparent), 0 0 13px color-mix(in oklch, var(--positive) 55%, transparent);
+  }
+  .status-info { min-width: 0; flex: 1; }
+  .status-title { font-size: 13px; font-weight: 700; color: var(--positive); }
+  .status-sub { margin-top: 4px; }
+  
+  /* ---------- botões ---------- */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+  .reprove-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 15px;
+    border-radius: 12px;
+    border: 1px solid rgba(248, 113, 113, 0.35) !important;
+    background: rgba(248, 113, 113, 0.12) !important;
+    color: var(--negative) !important;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .reprove-button:hover { background: rgba(248, 113, 113, 0.2) !important; border-color: rgba(248, 113, 113, 0.5) !important; }
+  .register-area { display: flex; justify-content: center; padding: 25px 0 6px; }
+  .register-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #C8960C 0%, #D4AF37 50%, #B8860B 100%) !important;
+    color: #000 !important;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    box-shadow: 0 2px 12px rgba(212, 175, 55, 0.35);
+    animation: register-pulse 2.6s ease-in-out infinite;
+    transition: all 0.2s;
+  }
+  .register-button:active { transform: scale(0.97); }
+  .register-icon-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+  }
+  @keyframes register-pulse {
+    0%, 100% { box-shadow: 0 2px 12px rgba(212, 175, 55, 0.35); }
+    50% { box-shadow: 0 2px 22px rgba(212, 175, 55, 0.65); }
+  }
+  .delete-account-area { display: flex; justify-content: center; padding: 4px 0 18px; }
+  .delete-account-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    border-radius: 20px;
+    padding: 0 16px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--muted-foreground) !important;
+    border: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .delete-account-button:hover {
+    color: var(--destructive) !important;
+    border-color: color-mix(in oklch, var(--destructive) 35%, transparent);
+    background: color-mix(in oklch, var(--destructive) 8%, transparent) !important;
+  }
+  
+  /* ---------- diálogos ---------- */
+  .account-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: color-mix(in oklch, var(--background), transparent 15%);
+    backdrop-filter: blur(5px);
+  }
+  .dialog-box {
+    width: 100%;
+    max-width: 384px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    padding: 20px;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.6);
+  }
+  .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; }
+  .dialog-title { font-size: 18px; font-weight: 600; }
+  .dialog-sub { margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
+  .dialog-body-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    font-size: 14px;
+  }
+  .dialog-meta { color: var(--muted-foreground); }
+  .dialog-amount { white-space: nowrap; }
+  .dialog-delete { margin-top: 20px; }
+  .dialog-warn { margin-bottom: 16px; color: var(--destructive); }
+  .dialog-text { margin-top: 8px; font-size: 14px; line-height: 24px; color: var(--muted-foreground); }
+  .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 24px; }
+  .dialog-btn {
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card) !important;
+    color: var(--primary) !important;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .dialog-btn:hover { background: var(--secondary) !important; }
+  .dialog-btn-danger {
+    height: 44px;
+    border-radius: 8px;
+    background: var(--destructive) !important;
+    color: oklch(0.96 0 0) !important;
+    font-size: 13px;
+    font-weight: 500;
+    transition: filter 0.15s;
+  }
+  .dialog-btn-danger:hover { filter: brightness(1.1); }
+  .dialog-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+  
+  /* ---------- responsivo ---------- */
+  @media (max-width: 680px) {
+    .account-container { width: calc(100% - 38px); }
+    .performance-panel .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .metric { gap: 9px; padding: 7px 9px; }
+    .metric-icon { width: 29px; height: 29px; }
+    .metric .metric-label { font-size: 11px; }
+    .metric .metric-value { font-size: 16px; }
+    .trade-row { grid-template-columns: 30px minmax(64px, 1fr) minmax(92px, 1.2fr) 72px 10px; column-gap: 6px; }
+    .trade-date { font-size: 10px; gap: 3px; }
+    .trade-amount { font-size: 14px; }
+    .status-content { flex-wrap: wrap; }
+    .reprove-button { margin-left: auto; }
+  }
+  @media (max-width: 370px) {
+    .trade-date svg, .date-separator { display: none; }
+    .trade-row { grid-template-columns: 26px minmax(62px, 1fr) minmax(78px, 1.1fr) 64px 8px; column-gap: 4px; }
+    .trade-amount { font-size: 13px; }
+    .progress-dots { gap: 4px; }
+    .progress-dots i { width: 7px; height: 7px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }

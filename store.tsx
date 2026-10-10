@@ -32,6 +32,7 @@ interface AppContextValue {
   resetObjective: () => Promise<{ ok: boolean; error?: string }>;
   syncJourneyAchievements: () => Promise<void>;
   createPropFirm: (input: PropFirmConfig) => Promise<{ ok: boolean; error?: string }>;
+  deleteFirm: (id: string) => Promise<{ ok: boolean; error?: string }>;
 }
 const AppContext = createContext<AppContextValue | null>(null);
 const EMPTY_DATA: AppData = { accounts: [], trades: [], movements: [], seeded: true };
@@ -292,7 +293,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: true };
     };
 
-    return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, journeyState, propFirms, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount, startJourney, resetJourney, saveJourneyObjective, completeJourneyObjective, resetObjective, syncJourneyAchievements, createPropFirm };
+    const deleteFirm: AppContextValue['deleteFirm'] = async id => {
+      const { error } = await supabase.from('prop_firms').delete().eq('id', id);
+      if (error) return { ok: false, error: error.message };
+      setPropFirms(prev => prev.filter(f => f.id !== id));
+      return { ok: true };
+    };
+
+    return { data, accounts: data.accounts, trades: data.trades, movements: data.movements, loading, journeyState, propFirms, addAccount, addTrade, setAccountStatus, addMovement, deleteMovement, deleteTrade, deleteAccount, startJourney, resetJourney, saveJourneyObjective, completeJourneyObjective, resetObjective, syncJourneyAchievements, createPropFirm, deleteFirm };
   }, [data, loading, journeyState, user, propFirms]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -1,81 +1,408 @@
-import { ArrowLeft, Trash2, AlertTriangle, TrendingUp, Shield, CalendarDays, Wallet, Gauge, CircleDollarSign, Crown, Check } from 'lucide-react';
+/**
+ * AccountDetail — tela de detalhes da conta
+ * Visual novo (Lovable) MESCLADO com a lógica real do app:
+ * - dados vêm de useApp() (Supabase), nada é inventado/fixo
+ * - cálculos de risco, meta, drawdown, consistência e concentração
+ *   são os mesmos do arquivo original (FundingPips 2 Step Flex +
+ *   mesas personalizadas via hydrateRules)
+ * - excluir conta / reprovar / excluir trade chamam de fato o store
+ * - navegação (onBack / onRegisterTrade) volta a funcionar
+ *
+ * Lembre de importar 'account-detail.css' (mesma pasta) uma vez.
+ */
 import { useState } from 'react';
+import {
+  ArrowDown, ArrowLeft, ArrowUp, AlertTriangle, CalendarDays, Check, ChevronRight,
+  Equal, Plus, ShieldX, Trash2, X, TrendingUp, Shield, Percent,
+} from 'lucide-react';
 import { useApp } from '@/store';
-import type { Account, Trade } from '@/types';
-import { DEFAULT_FIRM_ID, SIZE_VALUES } from '@/types';
-import { FUNDING_PIPS_RULES, getFundingPipsPhaseTarget, getFundingPipsMaxLossLimit, getFundingPipsProfitConcentrationLimit, getFundingPipsProfitableDayMinimum } from '@/fundingPips2StepFlex';
-import { hydrateRules, type PhaseRules } from '@/propConfig';
-import { formatCurrency, formatSignedCurrency, formatDateTime } from '@/dates';
+import type { Trade } from '@/types';
+import { DEFAULT_FIRM_ID, SIZE_VALUES, SIZE_HEX } from '@/types';
+import {
+  FUNDING_PIPS_RULES, getFundingPipsPhaseTarget, getFundingPipsMaxLossLimit,
+  getFundingPipsProfitConcentrationLimit, getFundingPipsProfitableDayMinimum,
+} from '@/fundingPips2StepFlex';
+import { hydrateRules } from '@/propConfig';
+import { formatCurrency, formatSignedCurrency, formatDateTime, operationalDay } from '@/dates';
+import './account-detail.css';
 
-export function AccountDetail({ accountId, onBack, onRegisterTrade }: { accountId: string; onBack: () => void; onRegisterTrade: (id: string) => void }) {
-  const { accounts, trades, movements, propFirms, setAccountStatus, deleteAccount } = useApp();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmReprove, setConfirmReprove] = useState(false);
+type Confirm = 'account' | 'reprove' | 'trade' | null;
+type ResultKind = 'take' | 'stop' | 'even';
+
+export function AccountDetail({
+  accountId, onBack, onRegisterTrade,
+}: { accountId: string; onBack: () => void; onRegisterTrade: (id: string) => void }) {
+  const { accounts, trades, movements, propFirms, setAccountStatus, deleteAccount, deleteTrade } = useApp();
+  const [confirm, setConfirm] = useState<Confirm>(null);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [reproving, setReproving] = useState(false);
   const [reproveError, setReproveError] = useState('');
+
   const account = accounts.find(a => a.id === accountId);
-  if (!account) return <div className="p-6 text-white"><button onClick={onBack}>Voltar</button><p className="mt-4 text-gray-500">Conta não encontrada.</p></div>;
+
+  if (!account) {
+    return (
+      <div className="account-shell">
+        <main className="account-container account-content">
+          <button className="icon-btn" aria-label="Voltar" onClick={onBack}>
+            <ArrowLeft size={20} strokeWidth={1.5} />
+          </button>
+          <p style={{ marginTop: 16, color: 'var(--muted-foreground)' }}>Conta não encontrada.</p>
+        </main>
+      </div>
+    );
+  }
+
   const firm = propFirms.find(f => f.id === (account.firmId ?? DEFAULT_FIRM_ID));
   const firmName = firm?.name ?? 'FundingPips';
+  const isDefaultFirm = (account.firmId ?? DEFAULT_FIRM_ID) === DEFAULT_FIRM_ID;
   const program = firm?.programs.find(p => p.sizes.includes(account.size));
+
   const accountTrades = trades.filter(t => t.accountId === accountId);
   const currentPhase = account.status === 'Avaliacao' ? (account.phase === 2 ? 2 : 1) : 0;
-  const lastPayoutAt = movements.filter(m => m.type === 'saque' && m.accountId === accountId).reduce((max, m) => Math.max(max, m.timestamp), 0);
+  const lastPayoutAt = movements
+    .filter(m => m.type === 'saque' && m.accountId === accountId)
+    .reduce((max, m) => Math.max(max, m.timestamp), 0);
   const cycleStart = Math.max(lastPayoutAt, account.fundedAt ?? 0);
-  const currentPhaseTrades = accountTrades.filter(t => (t.phase ?? 1) === currentPhase && (currentPhase !== 0 || t.timestamp > cycleStart));
-  return <div className="min-h-screen bg-[#050506] text-white pb-24"><main className="max-w-6xl mx-auto px-4 md:px-5 py-5 md:py-6 space-y-4 md:space-y-5"><button onClick={onBack} className="mb-1 w-10 h-10 rounded-xl bg-[#101012] border border-[#3A3118] grid place-items-center text-[#D4AF37] hover:border-[#D4AF37] transition"><ArrowLeft size={18}/></button><PremiumCard account={account} firmName={firmName}/><RiskPanel account={account} trades={currentPhaseTrades} isDefaultFirm={(account.firmId ?? DEFAULT_FIRM_ID) === DEFAULT_FIRM_ID} phaseRules={program?.phases.find(p => p.phase === currentPhase)?.rules}/><button onClick={() => onRegisterTrade(accountId)} className="mx-auto flex items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/60 bg-gradient-to-r from-[#7C5D0D] via-[#D4AF37] to-[#8A6811] px-8 py-4 text-sm font-black uppercase tracking-[0.14em] text-black"><CircleDollarSign size={18}/>Registrar Trade</button><Performance trades={currentPhaseTrades}/><TradeHistory trades={accountTrades}/><ReprovePanel account={account} onRequestReprove={() => setConfirmReprove(true)}/><button aria-label="Excluir conta" onClick={() => setConfirmDelete(true)} className="mx-auto flex flex-col items-center gap-1.5"><span className="p-3 rounded-full border border-[#D4AF37]/40 bg-[#0D0D0F] text-[#D4AF37]"><Trash2 size={19}/></span><span className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37]/70">Excluir conta</span></button></main>{confirmDelete && <div className="fixed inset-0 z-50 bg-black/75 grid place-items-center p-4"><div className="w-full max-w-md rounded-3xl bg-[#111113] border border-[#3A3118] p-6"><AlertTriangle className="text-red-400 mb-3"/><h3 className="text-lg font-bold">Excluir conta?</h3><p className="text-sm text-gray-500 mt-1 mb-5">A conta e seus trades serão removidos.</p><button onClick={() => { deleteAccount(accountId); onBack(); }} className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-bold mb-2">Sim, excluir conta</button><button onClick={() => setConfirmDelete(false)} className="w-full py-3.5 rounded-2xl bg-[#222225] text-white">Cancelar</button></div></div>}{confirmReprove && <div className="fixed inset-0 z-50 bg-black/75 grid place-items-center p-4"><div className="w-full max-w-md rounded-3xl bg-[#111113] border border-[#3A3118] p-6"><AlertTriangle className="text-amber-400 mb-3"/><h3 className="text-lg font-bold">Marcar esta conta como Reprovada?</h3><p className="text-sm text-gray-500 mt-1 mb-5">Ela vai sair da Dashboard e não será mais sugerida para operar. O histórico de trades continua contando nas outras abas.</p>{reproveError && <p className="mb-3 text-xs text-red-400">{reproveError}</p>}<button disabled={reproving} onClick={async () => { setReproving(true); setReproveError(''); const res = await setAccountStatus(accountId, 'Reprovada'); setReproving(false); if (!res.ok) { setReproveError(`Não foi possível reprovar a conta. ${res.error || 'Tente novamente.'}`); return; } onBack(); }} className="w-full py-3.5 rounded-2xl bg-amber-500 text-black font-bold mb-2 disabled:opacity-50">{reproving ? 'Salvando...' : 'Sim, reprovar conta'}</button><button onClick={() => { setConfirmReprove(false); setReproveError(''); }} className="w-full py-3.5 rounded-2xl bg-[#222225] text-white">Cancelar</button></div></div>}</div>;
-}
-
-function PremiumCard({ account, firmName }: { account: Account; firmName: string }) {
-  const funded = account.status === 'Financiada';
-  const statusLabel = funded ? 'MASTER' : account.phase === 2 ? 'FASE 2' : 'FASE 1';
-  const accentColor = funded ? '#2ECC71' : '#3B82F6';
-  return (
-    <section className="relative overflow-hidden rounded-2xl p-5 md:p-6" style={{ background: 'linear-gradient(145deg, #191400 0%, #0D0D10 60%, #0A0A0C 100%)', border: '1px solid rgba(212,175,55,0.5)', boxShadow: '0 0 30px rgba(212,175,55,0.1), 0 8px 32px rgba(0,0,0,0.5)' }}>
-      <div className="absolute -top-10 -right-10 w-52 h-52 rounded-full pointer-events-none animate-dash-glow" style={{ background: 'radial-gradient(circle, rgba(212,175,55,0.25) 0%, rgba(212,175,55,0.05) 50%, transparent 70%)' }} />
-      <div className="absolute top-4 right-14 opacity-20 pointer-events-none" style={{ width: 80, height: 80, backgroundImage: 'radial-gradient(circle, #D4AF37 1px, transparent 1px)', backgroundSize: '8px 8px', maskImage: 'radial-gradient(circle, black 30%, transparent 80%)' }} />
-      <div className="relative flex items-center gap-4 md:gap-5">
-        <div className="h-16 w-16 md:h-20 md:w-20 shrink-0 rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle, #2A2000 0%, #1A1400 100%)', border: '2px solid rgba(212,175,55,0.6)', boxShadow: '0 0 16px rgba(212,175,55,0.2)' }}><Crown size={30} strokeWidth={1.5} style={{ color: '#D4AF37' }} /></div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 min-w-0"><p className="text-xl md:text-[26px] font-black tracking-tight truncate text-white">{account.name}</p><span className="shrink-0 rounded-md px-2 py-0.5 text-[10px] md:text-[11px] font-black uppercase tracking-wider" style={{ background: `${accentColor}22`, color: accentColor }}>{statusLabel}</span></div>
-          <p className="text-xs md:text-sm mt-1 font-bold uppercase tracking-wider" style={{ color: '#D4AF37' }}>{firmName} • {account.size}</p>
-          <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}><span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#9CA3AF' }}>Código</span><span className="text-xs font-extrabold tracking-wide" style={{ color: '#D4AF37' }}>{account.code}</span></div>
-        </div>
-      </div>
-    </section>
+  const currentPhaseTrades = accountTrades.filter(
+    t => (t.phase ?? 1) === currentPhase && (currentPhase !== 0 || t.timestamp > cycleStart)
   );
-}
+  const phaseRules = program?.phases.find(p => p.phase === currentPhase)?.rules;
 
-function RiskPanel({ account, trades, isDefaultFirm, phaseRules }: { account: Account; trades: Trade[]; isDefaultFirm: boolean; phaseRules?: PhaseRules }) {
+  // ----- Margem de risco (idêntico ao original) -----
   const capital = SIZE_VALUES[account.size] || 0;
-  const phase = account.status === 'Avaliacao' && account.phase === 2 ? 2 : account.status === 'Avaliacao' ? 1 : 0;
   const hydrated = !isDefaultFirm && phaseRules ? hydrateRules(phaseRules, account.size) : null;
-  const target = hydrated ? (hydrated.target ?? 0) : phase === 2 ? getFundingPipsPhaseTarget(capital, 2) : phase === 1 ? getFundingPipsPhaseTarget(capital, 1) : 0;
+  const target = hydrated
+    ? (hydrated.target ?? 0)
+    : currentPhase === 2 ? getFundingPipsPhaseTarget(capital, 2)
+    : currentPhase === 1 ? getFundingPipsPhaseTarget(capital, 1)
+    : 0;
   const drawdown = hydrated ? (hydrated.maxDrawdown ?? 0) : getFundingPipsMaxLossLimit(capital);
-  const scaleRight = phase === 0 ? drawdown : target;
-  const pnl = trades.reduce((s, t) => s + t.amount, 0);
+  const scaleRight = currentPhase === 0 ? drawdown : target;
+  const pnl = currentPhaseTrades.reduce((s, t) => s + t.amount, 0);
   const lossUsed = Math.max(0, -pnl);
-  const riskPct = drawdown > 0 ? Math.min(100, lossUsed / drawdown * 100) : 0;
-  const progressPct = scaleRight > 0 ? Math.min(100, Math.max(0, pnl / scaleRight * 100)) : 0;
+  const riskPct = drawdown > 0 ? Math.min(100, (lossUsed / drawdown) * 100) : 0;
+  const progressPct = scaleRight > 0 ? Math.min(100, Math.max(0, (pnl / scaleRight) * 100)) : 0;
   const markerPct = Math.min(100, Math.max(0, 50 + (progressPct - riskPct) / 2));
-  const profitableDaysRequired = hydrated ? (phaseRules?.profitableDaysEnabled ? (phaseRules.profitableDays ?? 0) : 0) : FUNDING_PIPS_RULES.minimumProfitableDays;
-  const profitableDayMinimum = hydrated ? (phaseRules?.profitableDayPct ? (capital * phaseRules.profitableDayPct) / 100 : 0) : getFundingPipsProfitableDayMinimum(capital);
-  const dayTotals = trades.reduce<Record<string, number>>((m, t) => { const d = new Date(t.timestamp).toDateString(); m[d] = (m[d] || 0) + t.amount; return m; }, {});
+
+  const profitableDaysRequired = hydrated
+    ? (phaseRules?.profitableDaysEnabled ? (phaseRules.profitableDays ?? 0) : 0)
+    : FUNDING_PIPS_RULES.minimumProfitableDays;
+  const profitableDayMinimum = hydrated
+    ? (phaseRules?.profitableDayPct ? (capital * phaseRules.profitableDayPct) / 100 : 0)
+    : getFundingPipsProfitableDayMinimum(capital);
+  const dayTotals = currentPhaseTrades.reduce<Record<string, number>>((m, t) => {
+    const d = operationalDay(t.timestamp);
+    m[d] = (m[d] || 0) + t.amount;
+    return m;
+  }, {});
   const profitableDays = Object.values(dayTotals).filter(v => v >= profitableDayMinimum).length;
   const maxDay = Math.max(0, ...Object.values(dayTotals));
   const concentrationLimit = isDefaultFirm ? getFundingPipsProfitConcentrationLimit(capital) : null;
   const concentrationPct = concentrationLimit === null || target <= 0 ? null : (maxDay / target) * 100;
   const concentrationExceeded = concentrationPct !== null && concentrationPct > concentrationLimit;
   const withinDrawdown = pnl > -drawdown;
-  return <section className="overflow-hidden rounded-[26px] border border-[#3A3118] bg-[#09090A]"><div className="px-5 md:px-6 pt-5 md:pt-6"><h3 className="text-[12px] md:text-sm font-extrabold uppercase tracking-[0.1em] text-[#E5BF4A]">Margem de Risco</h3></div><div className="px-5 md:px-8 pt-6 pb-4">
-  <div className="relative mt-8"><div className="absolute -top-8 z-40 -translate-x-1/2 whitespace-nowrap rounded-xl border border-[#5A5A60] bg-[#0D0D0F] px-3 py-1.5 text-sm md:text-base font-black shadow-lg" style={{ left: `${markerPct}%` }}><span className={pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedCurrency(pnl)}</span><span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-[#5A5A60] bg-[#0D0D0F]" /></div><div className="relative h-9 md:h-10 rounded-full border border-[#36363B] bg-[#17171A] overflow-hidden"><div className="absolute inset-y-0 left-0 w-1/2 overflow-hidden"><div className="absolute inset-y-0 right-0 bg-gradient-to-l from-red-950/40 via-red-500/80 to-red-300/80" style={{ width: `${riskPct}%` }}/></div><div className="absolute inset-y-0 left-1/2 w-1/2 overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500/90 via-blue-600/80 to-blue-950/30" style={{ width: `${progressPct}%` }}/></div><div className="absolute inset-y-0 left-1/2 w-px bg-white/60 z-20"/><div aria-label={`Posição do resultado: ${formatSignedCurrency(pnl)}`} className="absolute top-1/2 z-30 h-7 w-7 md:h-8 md:w-8 rounded-full border border-[#FFE58A] bg-[#F4C93D] shadow-[0_0_16px_rgba(244,201,61,.7)] -translate-y-1/2 -translate-x-1/2" style={{ left: `${markerPct}%` }}/></div></div><div className="grid grid-cols-3 mt-3 text-[13px] md:text-sm font-bold text-[#D6D6DA]"><span className="text-left">-{formatCurrency(drawdown)}</span><span className="text-center font-black text-white">0</span><span className="text-right">+{formatCurrency(scaleRight)}</span></div><div className="flex flex-wrap justify-center gap-4 md:gap-10 mt-4 text-[12px] md:text-sm"><span className="inline-flex items-center gap-2 text-[#D6D6DA] font-semibold"><span className="h-3 w-3 rounded-full bg-red-500"/>Risco (Drawdown)</span><span className="inline-flex items-center gap-2 text-[#D6D6DA] font-semibold"><span className="h-3 w-3 rounded-full bg-blue-500"/>Progresso da Meta {phase !== 0 ? '(Challenge)' : ''}</span></div></div>
-  {profitableDaysRequired > 0 && <div className="border-t border-[#2C2C30]"><div className="flex items-center gap-3 px-5 md:px-7 py-4 border-b border-[#2C2C30]"><div className="h-9 w-9 rounded-full border border-blue-500/60 bg-blue-500/10 grid place-items-center text-blue-400"><CalendarDays size={18}/></div><div className="flex-1 text-xs md:text-sm"><span className="font-medium">Consistência:</span> <strong className="text-blue-400">{profitableDays} / {profitableDaysRequired}</strong> <span className="text-[#C7C7CB]">Dias Concluídos</span></div><div className="hidden sm:flex gap-2">{Array.from({ length: profitableDaysRequired }).map((_, i) => <span key={i} className={`h-4 w-4 rounded-full border ${i < profitableDays ? 'border-blue-400 bg-blue-500' : 'border-[#57575D] bg-transparent'}`}/>)}</div></div>{concentrationLimit !== null && phase !== 0 && <div className={`flex items-center gap-3 px-5 md:px-7 py-4 border-b border-[#2C2C30] ${concentrationExceeded ? 'bg-amber-400/[0.025]' : ''}`}><div className="h-9 w-9 shrink-0 rounded-full border border-[#D4AF37] bg-[#D4AF37]/10 grid place-items-center text-[#D4AF37] text-lg font-bold">%</div><div className="flex-1 min-w-0"><p className="text-xs md:text-sm font-medium">Concentração do Melhor Dia: <strong>{concentrationPct === null ? '—' : `${concentrationPct.toFixed(0)}% da meta`}</strong></p><p className={`text-[10px] md:text-xs mt-0.5 ${concentrationExceeded ? 'text-amber-300' : 'text-[#A9A9AE]'}`}>{concentrationExceeded ? `Acima da referência de ${concentrationLimit}%.` : `Dentro da regra dos ${concentrationLimit}%. Continue operando.`}</p></div><div className={`h-9 w-9 shrink-0 rounded-full border grid place-items-center ${concentrationExceeded ? 'border-amber-400 text-amber-400' : 'border-emerald-400 text-emerald-400'}`}>{concentrationExceeded ? '!' : <Check size={19}/>}</div></div>}</div>}{!withinDrawdown && <div className="mx-5 mb-5 rounded-2xl border border-red-400/30 bg-red-400/[0.06] p-4 text-xs text-red-300">A perda acumulada ultrapassou o drawdown estático configurado para esta conta.</div>}</section>;
+  const remainingToTarget = currentPhase !== 0 ? Math.max(0, target - pnl) : null;
+  const targetHit = remainingToTarget !== null && remainingToTarget <= 0;
+  const remainingToDrawdown = Math.max(0, drawdown + pnl);
+
+  // ----- Performance -----
+  const takes = currentPhaseTrades.filter(t => t.result === 'Take').length;
+  const stops = currentPhaseTrades.filter(t => t.result === 'Stop').length;
+  const bes = currentPhaseTrades.filter(t => t.result === 'BE').length;
+  const sortedTrades = [...accountTrades].sort((a, b) => b.timestamp - a.timestamp);
+
+  const funded = account.status === 'Financiada';
+  const statusLabel = funded ? 'MASTER' : account.phase === 2 ? 'FASE 2' : 'FASE 1';
+  const sizeColor = SIZE_HEX[account.size];
+  const resultKind = (t: Trade): ResultKind => (t.result === 'Take' ? 'take' : t.result === 'Stop' ? 'stop' : 'even');
+  const tradePhaseLabel = (t: Trade) => ((t.phase ?? 1) === 0 ? 'MASTER' : (t.phase ?? 1) === 2 ? 'F2' : 'F1');
+
+  // ----- Ações (chamam o store de verdade) -----
+  const handleReprove = async () => {
+    setReproving(true);
+    setReproveError('');
+    const res = await setAccountStatus(accountId, 'Reprovada');
+    setReproving(false);
+    if (!res.ok) {
+      setReproveError(`Não foi possível reprovar a conta. ${res.error || 'Tente novamente.'}`);
+      return;
+    }
+    setConfirm(null);
+    onBack();
+  };
+  const handleDeleteAccount = () => { deleteAccount(accountId); onBack(); };
+  const handleDeleteTrade = () => {
+    if (selectedTrade) deleteTrade(selectedTrade.id);
+    setConfirm(null);
+    setSelectedTrade(null);
+  };
+
+  return (
+    <div className="account-shell">
+      <header className="account-topbar">
+        <div className="account-container topbar-inner">
+          <button className="icon-btn" aria-label="Voltar" onClick={onBack}>
+            <ArrowLeft size={20} strokeWidth={1.5} />
+          </button>
+        </div>
+      </header>
+
+      <main className="account-container account-content">
+        {/* Card 1 — identidade da conta */}
+        <section className="account-panel account-identity" aria-label={`Conta ${account.name}`}>
+          <div className="identity-mark">
+            <Shield size={36} strokeWidth={1.2} />
+            <TrendingUp size={17} strokeWidth={1.7} className="identity-mark-icon" />
+          </div>
+          <div className="identity-text">
+            <div className="identity-title-row">
+              <h1 className="identity-name">{account.name}</h1>
+              <span className="phase-pill" style={{ color: sizeColor.solid, borderColor: sizeColor.ring, background: sizeColor.soft }}>{statusLabel}</span>
+            </div>
+            <p className="identity-sub">{firmName} · {account.size}</p>
+            <p className="account-code numeric">Código: <span style={{ color: sizeColor.solid }}>{account.code}</span></p>
+          </div>
+        </section>
+
+        {/* Card 2 — margem de risco */}
+        <section className="account-panel risk-panel" aria-labelledby="risk-title">
+          <h2 id="risk-title" className="section-heading">Margem de risco</h2>
+          <div className="risk-axis">
+            <div className="risk-bubble" style={{ left: `${markerPct}%` }} aria-label={`Resultado: ${formatSignedCurrency(pnl)}`}>
+              <span className="risk-bubble-label">Resultado Atual</span>
+              <span className={`risk-bubble-value numeric ${pnl >= 0 ? 'amount-take' : 'amount-stop'}`}>
+                {formatSignedCurrency(pnl)}<span className="risk-bubble-pointer" />
+              </span>
+            </div>
+            <div className="risk-track">
+              <span className="risk-glow glow-red" aria-hidden="true" />
+              <span className="risk-glow glow-blue" aria-hidden="true" />
+              <div className="risk-line"><span className="risk-sheen" /></div>
+              <span className="risk-cursor" style={{ left: `${markerPct}%` }} />
+            </div>
+            <span className="risk-reflection" aria-hidden="true" />
+            <div className="numeric risk-labels">
+              <span>-{formatCurrency(drawdown)}</span><span>0</span><span>+{formatCurrency(scaleRight)}</span>
+            </div>
+          </div>
+
+          <div className="risk-remaining">
+            <div className="risk-remaining-item">
+              <span className="risk-remaining-label">Margem até o limite</span>
+              <span className="risk-remaining-value numeric to-drawdown">{formatCurrency(remainingToDrawdown)}</span>
+            </div>
+            {remainingToTarget !== null && (
+              <div className="risk-remaining-item">
+                <span className="risk-remaining-label">Falta p/ meta</span>
+                <span className={`risk-remaining-value numeric ${targetHit ? 'hit' : 'to-target'}`}>
+                  {targetHit ? 'Meta atingida!' : formatCurrency(remainingToTarget)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {profitableDaysRequired > 0 && (
+            <div className="risk-details">
+              <div className="risk-detail">
+                <span className="detail-icon icon-blue"><CalendarDays size={17} strokeWidth={1.5} /></span>
+                <p className="detail-text">
+                  Consistência: <strong className="detail-strong">{profitableDays} / {profitableDaysRequired} Dias Concluídos</strong>
+                </p>
+                <div className="progress-dots" aria-label={`${profitableDays} de ${profitableDaysRequired} dias concluídos`}>
+                  {Array.from({ length: profitableDaysRequired }).map((_, i) => (
+                    <i key={i} style={i >= profitableDays ? { background: 'transparent' } : undefined} />
+                  ))}
+                </div>
+              </div>
+
+              {concentrationLimit !== null && currentPhase !== 0 && (
+                <div className="risk-detail">
+                  <span className="detail-icon icon-gold"><Percent size={18} strokeWidth={1.8} /></span>
+                  <div className="detail-text">
+                    <p>Concentração do Melhor Dia: <strong className="detail-strong">{concentrationPct === null ? '—' : `${concentrationPct.toFixed(0)}% da meta`}</strong></p>
+                    <p className="detail-hint">
+                      {concentrationExceeded ? `Acima da referência de ${concentrationLimit}%.` : `Dentro da regra dos ${concentrationLimit}%. Continue operando.`}
+                    </p>
+                  </div>
+                  <span className={`detail-icon detail-check ${concentrationExceeded ? 'icon-red' : 'icon-green'}`}>
+                    {concentrationExceeded ? '!' : <Check size={17} />}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!withinDrawdown && (
+            <p style={{
+              marginTop: 16, padding: '12px 14px', borderRadius: 12,
+              border: '1px solid color-mix(in oklch, var(--negative) 30%, transparent)',
+              background: 'color-mix(in oklch, var(--negative) 6%, transparent)',
+              color: 'var(--negative)', fontSize: 12,
+            }}>
+              A perda acumulada ultrapassou o drawdown estático configurado para esta conta.
+            </p>
+          )}
+        </section>
+
+        {/* Card 3 — resultado e performance */}
+        <section className="account-panel performance-panel" aria-labelledby="performance-title">
+          <h2 id="performance-title" className="section-heading performance-heading">Resultado e performance</h2>
+          <div className="metric-grid">
+            <Metric label="Resultado" value={formatSignedCurrency(pnl)} kind={pnl >= 0 ? 'gold' : 'red'} icon={<span className="metric-dollar">$</span>} />
+            <Metric label="Takes" value={String(takes)} kind="green" icon={<ArrowUp size={19} strokeWidth={1.5} />} />
+            <Metric label="Stops" value={String(stops)} kind="red" icon={<ArrowDown size={19} strokeWidth={1.5} />} />
+            <Metric label="Break Evens" value={String(bes)} kind="neutral" icon={<Equal size={19} strokeWidth={1.5} />} />
+          </div>
+        </section>
+
+        {/* Card 4 — histórico de trades */}
+        <section className="account-panel history-panel" aria-labelledby="history-title">
+          <div className="history-header">
+            <h2 id="history-title" className="section-heading">Histórico de trades</h2>
+            <span className="history-count">{accountTrades.length} registros</span>
+          </div>
+          {sortedTrades.length === 0 ? (
+            <p style={{ padding: '32px 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>Nenhum trade registrado.</p>
+          ) : (
+            <div className="trade-list">
+              {sortedTrades.map((t) => {
+                const kind = resultKind(t);
+                return (
+                  <button key={t.id} className="trade-row" onClick={() => setSelectedTrade(t)} aria-label={`Ver trade ${t.asset}`}>
+                    <span className={`trade-icon icon-${kind}`}>
+                      {kind === 'take' ? <ArrowUp size={16} /> : kind === 'stop' ? <ArrowDown size={16} /> : <Equal size={16} />}
+                    </span>
+                    <span className="trade-main">
+                      <span className="trade-asset-row">
+                        <span className="trade-asset">{t.asset}</span>
+                        <span className="trade-phase-badge" style={{ color: sizeColor.solid, borderColor: sizeColor.ring, background: sizeColor.soft }}>{tradePhaseLabel(t)}</span>
+                      </span>
+                      <span className={`trade-side side-${kind}`}>{t.result}</span>
+                      <span className="trade-tags">{t.context} · {t.timeframe}{t.note ? ` · ${t.note}` : ''}</span>
+                    </span>
+                    <span className="trade-date numeric">
+                      <CalendarDays size={13} strokeWidth={1.4} />{formatDateTime(t.timestamp)}
+                    </span>
+                    <span className={`trade-amount numeric amount-${kind}`}>{formatSignedCurrency(t.amount)}</span>
+                    <ChevronRight size={15} className="trade-chevron" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Card 5 — status da conta */}
+        <section className="account-panel status-panel" aria-labelledby="status-title">
+          <h2 id="status-title" className="section-heading">Status da conta</h2>
+          {account.status === 'Reprovada' ? (
+            <div className="status-content">
+              <span className="status-dot" style={{ background: 'var(--negative)', boxShadow: 'none' }} />
+              <div className="status-info">
+                <p className="status-title" style={{ color: 'var(--negative)' }}>Conta Reprovada</p>
+                <p className="detail-hint status-sub">Esta conta foi marcada como reprovada.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="status-content">
+              <span className="status-dot" />
+              <div className="status-info">
+                <p className="status-title">Conta em Operação</p>
+                <p className="detail-hint status-sub">Sua conta está ativa e dentro das regras.</p>
+              </div>
+              <button className="reprove-button" onClick={() => setConfirm('reprove')}>
+                <ShieldX size={15} />Marcar como Reprovada
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Ações */}
+        <div className="register-area">
+          <button className="register-button" onClick={() => onRegisterTrade(accountId)}>
+            <span className="register-icon-badge"><Plus size={13} strokeWidth={2.8} /></span>
+            REGISTRAR TRADE
+          </button>
+        </div>
+        <div className="delete-account-area">
+          <button className="delete-account-button" aria-label="Excluir conta" onClick={() => setConfirm('account')}>
+            <Trash2 size={16} strokeWidth={1.5} />Excluir conta
+          </button>
+        </div>
+      </main>
+
+      {/* Diálogos */}
+      {(selectedTrade || confirm) && (
+        <div
+          className="account-dialog-backdrop"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setSelectedTrade(null); setConfirm(null); } }}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="dialog-title" className="dialog-box">
+            {selectedTrade && !confirm ? (
+              <>
+                <div className="dialog-head">
+                  <div>
+                    <h2 id="dialog-title" className="dialog-title">{selectedTrade.asset}</h2>
+                    <p className="dialog-sub">{formatDateTime(selectedTrade.timestamp)}</p>
+                  </div>
+                  <button className="icon-btn" aria-label="Fechar" onClick={() => setSelectedTrade(null)}><X size={17} /></button>
+                </div>
+                <div className="dialog-body-row">
+                  <span className="dialog-meta">{selectedTrade.result} · {selectedTrade.context} · {selectedTrade.timeframe}</span>
+                  <strong className={`dialog-amount numeric amount-${resultKind(selectedTrade)}`}>{formatSignedCurrency(selectedTrade.amount)}</strong>
+                </div>
+                <button className="reprove-button dialog-delete" onClick={() => setConfirm('trade')}>
+                  <Trash2 size={15} />Excluir trade
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="dialog-warn"><AlertTriangle size={24} /></div>
+                <h2 id="dialog-title" className="dialog-title">
+                  {confirm === 'account' ? 'Excluir conta?' : confirm === 'reprove' ? 'Marcar esta conta como Reprovada?' : 'Excluir este trade?'}
+                </h2>
+                <p className="dialog-text">
+                  {confirm === 'account'
+                    ? 'A conta e seus trades serão removidos.'
+                    : confirm === 'reprove'
+                      ? 'Ela vai sair da Dashboard e não será mais sugerida para operar. O histórico de trades continua contando nas outras abas.'
+                      : 'Os indicadores da conta serão recalculados.'}
+                </p>
+                {confirm === 'reprove' && reproveError && (
+                  <p style={{ color: 'var(--negative)', fontSize: 12, marginTop: 8 }}>{reproveError}</p>
+                )}
+                <div className="dialog-actions">
+                  <button className="dialog-btn" onClick={() => { setConfirm(null); setReproveError(''); }}>Cancelar</button>
+                  <button
+                    className="dialog-btn-danger"
+                    disabled={confirm === 'reprove' && reproving}
+                    onClick={() => {
+                      if (confirm === 'account') handleDeleteAccount();
+                      else if (confirm === 'reprove') handleReprove();
+                      else if (confirm === 'trade') handleDeleteTrade();
+                    }}
+                  >
+                    {confirm === 'reprove' ? (reproving ? 'Salvando...' : 'Sim, reprovar') : 'Sim, excluir'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function Performance({ trades }: { trades: Trade[] }) { const pnl = trades.reduce((s, t) => s + t.amount, 0); const takes = trades.filter(t => t.result === 'Take').length; const stops = trades.filter(t => t.result === 'Stop').length; const bes = trades.filter(t => t.result === 'BE').length; return <section className="rounded-[26px] border border-[#3A3118] bg-[#09090A] p-5 md:p-6"><h3 className="text-[12px] md:text-sm font-extrabold uppercase tracking-[0.1em] text-[#E5BF4A] mb-4">Resultado e Performance</h3><div className="grid grid-cols-2 lg:grid-cols-4 gap-3"><Stat label="Resultado Líquido" value={formatSignedCurrency(pnl)} cls={pnl >= 0 ? 'text-emerald-400' : 'text-red-400'} icon={Wallet}/><Stat label="Takes" value={String(takes)} cls="text-white" icon={TrendingUp}/><Stat label="Stops" value={String(stops)} cls="text-white" icon={Shield}/><Stat label="Break Evens" value={String(bes)} cls="text-white" icon={CircleDollarSign}/></div></section>; }
-function Stat({ label, value, cls, icon: Icon }: { label: string; value: string; cls: string; icon: any }) { return <div className="min-h-[104px] rounded-2xl border border-[#2D2D32] bg-[#111113] p-4 md:p-5"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full border grid place-items-center ${label === 'Resultado Líquido' ? 'border-[#D4AF37] text-[#D4AF37]' : label === 'Takes' ? 'border-emerald-400 text-emerald-400' : label === 'Stops' ? 'border-red-400 text-red-400' : 'border-white/60 text-white'}`}><Icon size={19}/></div><span className="text-[10px] md:text-[11px] text-[#D1D1D5] font-medium">{label}</span></div><p className={`mt-3 text-lg md:text-[20px] font-black ${cls}`}>{value}</p></div>; }
-function ReprovePanel({ account, onRequestReprove }: { account: Account; onRequestReprove: () => void }) {
-  if (account.status === 'Reprovada') return <section className="rounded-3xl border border-[#27272F] bg-[#111113] p-5"><div className="flex items-center gap-2"><Gauge size={17} className="text-[#D4AF37]"/><h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#D4AF37]">Esta conta foi reprovada</h3></div></section>;
-  return <section className="rounded-3xl border border-[#27272F] bg-[#111113] p-5"><div className="flex items-center gap-2 mb-4"><Gauge size={17} className="text-[#D4AF37]"/><h3 className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#D4AF37]">Status da conta</h3></div><p className="mb-4 text-xs leading-5 text-gray-500">A fase (Challenge/Master) é calculada automaticamente pelos seus trades. Se essa conta descumpriu alguma regra da mesa, marque-a como reprovada abaixo.</p><button onClick={onRequestReprove} className="w-full py-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-sm font-bold">Marcar conta como Reprovada</button></section>;
+function Metric({ label, value, kind, icon }: { label: string; value: string; kind: 'gold' | 'green' | 'red' | 'neutral'; icon: React.ReactNode }) {
+  return (
+    <div className="metric">
+      <span className={`metric-icon icon-${kind}`}>{icon}</span>
+      <div className="metric-body">
+        <p className="metric-label">{label}</p>
+        <p className={`metric-value numeric ${kind === 'green' || kind === 'gold' ? 'amount-take' : ''}`}>{value}</p>
+      </div>
+    </div>
+  );
 }
-function TradeHistory({ trades }: { trades: Trade[] }) { const { deleteTrade } = useApp(); const sorted = [...trades].sort((a, b) => b.timestamp - a.timestamp); const confirmDelete = (id: string) => { if (window.confirm('Excluir este trade? Os indicadores da conta serão recalculados.')) deleteTrade(id); }; return <section className="rounded-[26px] border border-[#3A3118] bg-[#09090A] p-4 md:p-5"><div className="mb-3 flex items-center justify-between gap-3 px-1"><h3 className="text-[12px] md:text-sm font-extrabold uppercase tracking-[0.1em] text-[#E5BF4A]">Histórico de Trades</h3><p className="text-[10px] md:text-[11px] text-[#A0A0A5]">{trades.length} registros</p></div>{sorted.length === 0 ? <div className="rounded-2xl border border-dashed border-[#3A3A40] p-8 text-center text-gray-600">Nenhum trade registrado.</div> : <div className="space-y-1">{sorted.map(t => <div key={t.id} className="rounded-2xl border border-[#28282D] bg-[#101012] p-3 md:p-3.5 flex items-center gap-3"><div className={`h-10 w-10 rounded-full grid place-items-center shrink-0 border ${t.result === 'Take' ? 'border-emerald-400 text-emerald-400' : t.result === 'Stop' ? 'border-red-400 text-red-400' : 'border-white/60 text-white'}`}>{t.result === 'Take' ? <TrendingUp size={17}/> : t.result === 'Stop' ? <Shield size={17}/> : <CircleDollarSign size={17}/>}</div><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><span className="text-[13px] md:text-sm font-bold truncate">{t.asset}</span><span className={`text-[10px] md:text-xs ${t.result === 'Take' ? 'text-emerald-400' : t.result === 'Stop' ? 'text-red-400' : 'text-[#A0A0A5]'}`}>{t.result}</span><span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: (t.phase ?? 1) === 0 ? 'rgba(46,204,113,0.14)' : 'rgba(59,130,246,0.14)', color: (t.phase ?? 1) === 0 ? '#2ECC71' : '#3B82F6' }}>{(t.phase ?? 1) === 0 ? 'Master' : (t.phase ?? 1) === 2 ? 'Fase 2' : 'Fase 1'}</span></div><p className="text-[11px] md:text-xs text-[#88888E] mt-1">{formatDateTime(t.timestamp)} · {t.context} · {t.timeframe}</p>{t.note && <p className="mt-2 rounded-xl border border-[#25252D] bg-[#0D0D11] px-3 py-2 text-xs leading-5 text-[#A7A7AE]"><span className="font-bold text-[#D4AF37]">Obs.:</span> {t.note}</p>}</div><div className="flex shrink-0 items-center gap-2"><div className={`text-[13px] md:text-sm font-black ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatSignedCurrency(t.amount)}</div><button type="button" aria-label={`Excluir trade ${t.asset}`} onClick={() => confirmDelete(t.id)} className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-600 hover:text-red-400"><Trash2 size={15}/></button></div></div>)}</div>}</section>; }

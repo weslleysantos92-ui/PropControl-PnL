@@ -1,7 +1,7 @@
 /* Register Trade modal — visual layer only. Keeps the existing flow and data logic untouched. */
 .pc-trade-modal-card {
-  width: min(100%, 448px) !important;
-  max-width: 448px !important;
+  width: min(100%, 672px) !important;
+  max-width: 672px !important;
   border-radius: 24px !important;
 }
 
@@ -23,8 +23,8 @@
 }
 
 .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > span {
-  gap: 6px !important;
-  font-size: 11px !important;
+  gap: 7px !important;
+  font-size: 13px !important;
 }
 
 .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > span svg {
@@ -34,21 +34,24 @@
 
 .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) input,
 .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) select {
-  height: 50px !important;
-  padding-left: 10px !important;
+  height: 52px !important;
+  padding-left: 14px !important;
   padding-right: 30px !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   border-radius: 14px !important;
 }
 
 .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) > label > div svg {
-  right: 8px !important;
+  right: 10px !important;
+  top: 18px !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 
 @media (max-width: 520px) {
   .pc-trade-modal-card {
     width: calc(100% - 16px) !important;
-    max-width: 448px !important;
+    max-width: 672px !important;
   }
 
   .pc-trade-modal .register-trade > section:nth-of-type(2) > div:nth-of-type(2) {
