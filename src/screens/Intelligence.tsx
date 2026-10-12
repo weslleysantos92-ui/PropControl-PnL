@@ -92,22 +92,21 @@ export function Intelligence() {
                 ))}
                 {stats.assets.length > 4 && <MoreButton expanded={showAllAssets} onClick={() => setShowAllAssets((value) => !value)} label="ativos" />}
               </Section>
-              <Section title="HORÁRIOS" subtitle="Quando sua execução é mais consistente" icon={<Clock3 />} tone="info" columns="TURNO · TRADES · WIN RATE · PNL">
-                {stats.shifts.map((item) => <ShiftRow key={item.shift} item={item} max={stats.shiftMax} />)}
-              </Section>
-              <Section title="CONTEXTOS" subtitle="Quais condições favorecem sua execução" icon={<Sparkles />} tone="violet" columns="CONTEXTO · TRADES · WIN RATE · PNL">
+              <Section className="card-contexts" title="CONTEXTOS" subtitle="Quais condições favorecem sua execução" icon={<Sparkles />} tone="violet" columns="CONTEXTO · TRADES · WIN RATE · PNL">
                 {(showAllContexts ? stats.contexts : stats.contexts.slice(0, 4)).map((item, index) => (
                   <RankRow key={item.key} item={item} rank={index + 1} max={stats.contextMax} />
                 ))}
                 {stats.contexts.length > 4 && <MoreButton expanded={showAllContexts} onClick={() => setShowAllContexts((value) => !value)} label="contextos" />}
               </Section>
+              <Section className="card-shifts" title="HORÁRIOS" subtitle="Quando sua execução é mais consistente" icon={<Clock3 />} tone="info" columns="TURNO · TRADES · WIN RATE · PNL">
+                {stats.shifts.map((item) => <ShiftRow key={item.shift} item={item} max={stats.shiftMax} />)}
+              </Section>
+              <Section className="card-timeframes" title="TIMEFRAMES" subtitle="Em qual período de gráfico você executa melhor" icon={<BarChart3 />} tone="positive">
+                <div className="tf-grid">
+                  {stats.timeframes.map((item) => <Timeframe key={item.timeframe} item={item} max={stats.timeframeMax} />)}
+                </div>
+              </Section>
             </div>
-
-            <Section title="TIMEFRAMES" subtitle="Em qual período de gráfico você executa melhor" icon={<BarChart3 />} tone="positive">
-              <div className="tf-grid">
-                {stats.timeframes.map((item) => <Timeframe key={item.timeframe} item={item} max={stats.timeframeMax} />)}
-              </div>
-            </Section>
 
             <Section title="LEITURA DO OPERACIONAL" subtitle={`Os extremos do período analisado (mínimo de ${MIN_SAMPLE} trades para entrar aqui).`} icon={<LineChart />} tone="info">
               <div className="highlight-grid">
@@ -163,9 +162,9 @@ function IconBadge({ children, small = false, hero = false, tone = 'primary' }: 
   );
 }
 
-function Section({ title, subtitle, icon, children, columns, tone = 'primary' }: { title: string; subtitle: string; icon: ReactNode; children: ReactNode; columns?: string; tone?: IconTone }) {
+function Section({ title, subtitle, icon, children, columns, tone = 'primary', className = '' }: { title: string; subtitle: string; icon: ReactNode; children: ReactNode; columns?: string; tone?: IconTone; className?: string }) {
   return (
-    <section className="intel-panel intel-section">
+    <section className={`intel-panel intel-section ${className}`.trim()}>
       <div className="section-head">
         <IconBadge small tone={tone}>{icon}</IconBadge>
         <div>
